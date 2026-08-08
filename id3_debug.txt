@@ -1,0 +1,143 @@
+-- 全世界陪我失眠 (Cover).mp3 --
+Tags present: True
+Keys: ['TIT2', 'TPE1', 'TALB', 'TDRC', 'TSSE', 'TXXX:minor_version', 'TXXX:major_brand', 'TXXX:compatible_brands', 'TXXX:description', 'APIC:Cover']
+  TIT2: 全世界陪我失眠 (Cover)
+  TPE1: Kokolayo 涂宇鑫
+  TALB: 全世界陪我失眠
+  TDRC: 2022
+  TSSE: Lavf62.3.100
+  TXXX:minor_version: 1
+  TXXX:major_brand: iso5
+  TXXX:compatible_brands: avc1iso5dsmsmsixdash
+  TXXX:description: Packed by Bilibili XCoder v2.0.2
+  APIC:Cover: mime=image/jpeg, type=PictureType.COVER_FRONT, desc=Cover, size=22926
+-- 孤单北半球 (R&B).mp3 --
+Tags present: True
+Keys: ['TIT2', 'TPE1', 'TALB', 'TDRC', 'TSSE', 'TXXX:major_brand', 'TXXX:minor_version', 'TXXX:compatible_brands', 'TXXX:description', 'APIC:Cover']
+  TIT2: 孤单北半球 (R&B)
+  TPE1: 卷笔刀阿卷
+  TALB: 孤单北半球
+  TDRC: 2025
+  TSSE: Lavf62.3.100
+  TXXX:major_brand: isom
+  TXXX:minor_version: 512
+  TXXX:compatible_brands: isomiso2avc1mp41iso5
+  TXXX:description: Packed by Bilibili XCoder v2.0.2
+  APIC:Cover: mime=image/png, type=PictureType.COVER_FRONT, desc=Cover, size=306003
+-- 心墙 (Cover).mp3 --
+Tags present: True
+Keys: ['TIT2', 'TPE1', 'TALB', 'TDRC', 'TSSE', 'APIC:Cover']
+  TIT2: 心墙 (Cover)
+  TPE1: 鸣小明
+  TALB: 心墙
+  TDRC: 2020
+  TSSE: Lavf58.20.100
+  APIC:Cover: mime=image/jpeg, type=PictureType.COVER_FRONT, desc=Cover, size=82218
+-- 是非题 (Cover).mp3 --
+Tags present: True
+Keys: ['TIT2', 'TPE1', 'TALB', 'TDRC', 'TSSE', 'TXXX:minor_version', 'TXXX:major_brand', 'TXXX:compatible_brands', 'APIC:Cover']
+  TIT2: 是非题 (Cover)
+  TPE1: WIFI 歪歪
+  TALB: 是非题·2023 - Single
+  TDRC: 2023
+  TSSE: Lavf60.16.100
+  TXXX:minor_version: 0
+  TXXX:major_brand: dash
+  TXXX:compatible_brands: iso6mp41
+  APIC:Cover: mime=image/jpeg, type=PictureType.COVER_FRONT, desc=Cover, size=41006
+-- 爱的回归线 (R&B版).mp3 --
+Tags present: True
+Keys: ['TIT2', 'TPE1', 'TALB', 'TDRC', 'TSSE', 'TXXX:major_brand', 'TXXX:minor_version', 'TXXX:compatible_brands', 'TXXX:description', 'APIC:Cover']
+  TIT2: 爱的回归线 (R&B版)
+  TPE1: 卷笔刀阿卷
+  TALB: 爱的回归线 (R&B版) - Single
+  TDRC: 2026
+  TSSE: Lavf62.3.100
+  TXXX:major_brand: isom
+  TXXX:minor_version: 512
+  TXXX:compatible_brands: isomiso2avc1mp41iso5
+  TXXX:description: Packed by Bilibili XCoder v2.0.2
+  APIC:Cover: mime=image/jpeg, type=PictureType.COVER_FRONT, desc=Cover, size=67803
+-- 爱错 (Cover).mp3 --
+Tags present: True
+Keys: ['TIT2', 'TPE1', 'TALB', 'TDRC', 'TSSE', 'TXXX:minor_version', 'TXXX:major_brand', 'TXXX:compatible_brands', 'APIC:Cover', 'APIC:Cover ']
+  TIT2: 爱错 (Cover)
+  TPE1: Young 曹杨
+  TALB: 时光音乐会4·纯享
+  TDRC: 2024
+  TSSE: Lavf60.16.100
+  TXXX:minor_version: 0
+  TXXX:major_brand: dash
+  TXXX:compatible_brands: iso6mp41
+  APIC:Cover: mime=image/jpeg, type=PictureType.COVER_FRONT, desc=Cover, size=153727
+  APIC:Cover : mime=image/jpeg, type=PictureType.COVER_FRONT, desc=Cover , size=153727
+-- 童话 (R&B).mp3 --
+Tags present: True
+Keys: ['TIT2', 'TPE1', 'TALB', 'TDRC', 'TSSE', 'TXXX:minor_version', 'TXXX:major_brand', 'TXXX:compatible_brands', 'APIC:Cover']
+  TIT2: 童话 (R&B)
+  TPE1: 卷笔刀阿卷
+  TALB: 音乐救助站
+  TDRC: 2026
+  TSSE: Lavf60.16.100
+  TXXX:minor_version: 0
+  TXXX:major_brand: dash
+  TXXX:compatible_brands: iso6mp41
+  APIC:Cover: mime=image/jpeg, type=PictureType.COVER_FRONT, desc=Cover, size=111224
+-- 续写 (Cover).mp3 --
+Tags present: True
+Keys: ['TIT2', 'TPE1', 'TALB', 'TDRC', 'TSSE', 'APIC:Cover']
+  TIT2: 续写 (Cover)
+  TPE1: Eric Chou
+  TALB: 续写
+  TDRC: 2022
+  TSSE: Lavf58.20.100
+  APIC:Cover: mime=image/jpeg, type=PictureType.COVER_FRONT, desc=Cover, size=27520
+-- 胆小鬼 (R&B版).mp3 --
+Tags present: True
+Keys: ['TIT2', 'TPE1', 'TALB', 'TDRC', 'TSSE', 'TXXX:major_brand', 'TXXX:minor_version', 'TXXX:compatible_brands', 'APIC:Cover']
+  TIT2: 胆小鬼 (R&B版)
+  TPE1: 阿野
+  TALB: 胆小鬼 (R&B版) - Single
+  TDRC: 2026
+  TSSE: Lavf60.16.100
+  TXXX:major_brand: isom
+  TXXX:minor_version: 512
+  TXXX:compatible_brands: isomiso2avc1mp41
+  APIC:Cover: mime=image/jpeg, type=PictureType.COVER_FRONT, desc=Cover, size=20336
+-- 轨迹 (cover).mp3 --
+Tags present: True
+Keys: ['TIT2', 'TPE1', 'TALB', 'TDRC', 'TSSE', 'TXXX:minor_version', 'TXXX:major_brand', 'TXXX:compatible_brands', 'TXXX:description', 'APIC:Cover']
+  TIT2: 轨迹 (cover)
+  TPE1: 陈家淇
+  TALB: 轨迹
+  TDRC: 2021
+  TSSE: Lavf62.3.100
+  TXXX:minor_version: 1
+  TXXX:major_brand: iso5
+  TXXX:compatible_brands: avc1iso5dsmsmsixdash
+  TXXX:description: Packed by Bilibili XCoder v2.0.2
+  APIC:Cover: mime=image/jpeg, type=PictureType.COVER_FRONT, desc=Cover, size=24868
+-- 错的人 (R&B).mp3 --
+Tags present: True
+Keys: ['TIT2', 'TPE1', 'TALB', 'TDRC', 'TSSE', 'TXXX:minor_version', 'TXXX:major_brand', 'TXXX:compatible_brands', 'APIC:Cover']
+  TIT2: 错的人 (R&B)
+  TPE1: 卷笔刀阿卷
+  TALB: The wrong person - Single
+  TDRC: 2024
+  TSSE: Lavf60.16.100
+  TXXX:minor_version: 0
+  TXXX:major_brand: dash
+  TXXX:compatible_brands: iso6mp41
+  APIC:Cover: mime=image/jpeg, type=PictureType.COVER_FRONT, desc=Cover, size=20623
+-- 雨天 (R&B).mp3 --
+Tags present: True
+Keys: ['TIT2', 'TPE1', 'TALB', 'TDRC', 'TSSE', 'TXXX:major_brand', 'TXXX:minor_version', 'TXXX:compatible_brands', 'APIC:Cover']
+  TIT2: 雨天 (R&B)
+  TPE1: 音乐的入门到改行
+  TALB: 雨天
+  TDRC: 2026
+  TSSE: Lavf60.16.100
+  TXXX:major_brand: isom
+  TXXX:minor_version: 512
+  TXXX:compatible_brands: isomiso2avc1mp41
+  APIC:Cover: mime=image/jpeg, type=PictureType.COVER_FRONT, desc=Cover, size=124391

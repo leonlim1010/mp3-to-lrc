@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SoniScript — MP3 to LRC</title>
+    <meta name="description" content="Transcribe MP3 files to LRC and correct lyrics with precise timestamps.">
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <!-- Ambient background -->
+    <div class="bg-blobs">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <div class="app-shell">
+        <!-- App Header -->
+        <header class="app-header">
+            <div class="brand">
+                <span class="brand-icon">🎵</span>
+                <h1>SoniScript</h1>
+            </div>
+            <!-- Tab bar -->
+            <nav class="tab-bar" role="tablist">
+                <button class="tab active" id="tab-upload" role="tab" aria-selected="true"
+                    onclick="switchTab('upload')">
+                    <span class="tab-icon">📁</span> Upload & Transcribe
+                </button>
+                <button class="tab" id="tab-editor" role="tab" aria-selected="false" onclick="switchTab('editor')">
+                    <span class="tab-icon">✏️</span> LRC Editor
+                </button>
+                <button class="tab" id="tab-tester" role="tab" aria-selected="false" onclick="switchTab('tester')">
+                    <span class="tab-icon">🎧</span> Sync Tester
+                </button>
+                <button class="tab" id="tab-tags" role="tab" aria-selected="false" onclick="switchTab('tags')">
+                    <span class="tab-icon">🏷️</span> Tag Manager
+                </button>
+            </nav>
+        </header>
+
+        <!-- ================================================================
+             TAB 1: Upload & Transcribe
+        ================================================================ -->
+        <section class="tab-panel active" id="panel-upload" role="tabpanel">
+            <div class="panel-inner">
+                <!-- Drop zone -->
+                <div class="card dropzone-card">
+                    <h2 class="card-title">1. Upload MP3 Files</h2>
+                    <div class="dropzone" id="drop-zone">
+                        <div class="dropzone-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="17 8 12 3 7 8" />
+                                <line x1="12" y1="3" x2="12" y2="15" />
+                            </svg>
+                        </div>
+                        <p class="dropzone-label">Drop MP3 files here or <span class="link-text">click to browse</span>
+                        </p>
+                        <p class="dropzone-sub">Multiple files supported</p>
+                        <input type="file" id="file-input" accept=".mp3" multiple hidden>
+                    </div>
+                </div>
+
+                <!-- File queue -->
+                <div class="card queue-card" id="queue-card" style="display:none;">
+                    <div class="queue-header">
+                        <h2 class="card-title">2. File Queue</h2>
+                        <div class="queue-actions">
+                            <button class="btn btn-ghost" id="clear-queue-btn" onclick="clearQueue()">Clear</button>
+                            <button class="btn btn-primary" id="transcribe-btn" onclick="transcribeAll()">
+                                <span class="btn-icon">🤖</span> Transcribe All
+                            </button>
+                        </div>
+                    </div>
+                    <div class="file-queue" id="file-queue"></div>
+                    <p class="queue-hint">LRC files will be saved to <code>C:\Users\User\Music</code></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================================================================
+             TAB 2: LRC Editor
+        ================================================================ -->
+        <section class="tab-panel" id="panel-editor" role="tabpanel" style="display:none;">
+            <div class="panel-inner editor-layout">
+
+                <!-- Left: File list -->
+                <aside class="editor-sidebar card" id="editor-sidebar">
+                    <div class="sidebar-header">
+                        <h2 class="card-title">LRC Files</h2>
+                        <div class="sidebar-header-actions">
+                            <span class="file-count-badge" id="file-count-badge" style="display:none;"></span>
+                            <button class="btn btn-ghost icon-btn" title="Refresh" onclick="loadLrcList()">↻</button>
+                        </div>
+                    </div>
+                    <div class="sidebar-search-wrap">
+                        <span class="search-icon">🔍</span>
+                        <input type="search" id="lrc-search" class="lrc-search-input" placeholder="Search files…"
+                            oninput="filterLrcList(this.value)" autocomplete="off">
+                    </div>
+                    <div class="lrc-list" id="lrc-list">
+                        <p class="empty-state">No LRC files found.<br>Transcribe some MP3s first.</p>
+                    </div>
+                </aside>
+                <!-- Resize handle -->
+                <div class="sidebar-resizer" id="sidebar-resizer" title="Drag to resize"></div>
+
+                <!-- Right: Editor -->
+                <main class="editor-main card" id="editor-main">
+                    <div class="editor-empty" id="editor-empty">
+                        <span class="editor-empty-icon">←</span>
+                        <p>Select an LRC file to start editing</p>
+                    </div>
+
+                    <div class="editor-content" id="editor-content" style="display:none;">
+                        <div class="editor-top-bar">
+                            <span class="editor-filename" id="editor-filename"></span>
+                            <button class="btn btn-primary" id="auto-align-btn" onclick="toggleAutoAlign()">Auto-align Full Lyrics</button>
+                            <button class="btn btn-success" id="save-btn" onclick="saveModified()">
+                                💾 Save as Modified
+                            </button>
+                        </div>
+
+                        <div class="auto-align-box" id="auto-align-box" style="display:none;">
+                            <div>
+                                <h3>Paste completed lyrics</h3>
+                                <p>Line breaks do not need to match. Existing timestamps remain unchanged.</p>
+                            </div>
+                            <textarea id="reference-lyrics" placeholder="Paste the complete, accurate lyrics here..." spellcheck="false"></textarea>
+                            <div class="auto-align-actions">
+                                <button class="btn btn-ghost" onclick="toggleAutoAlign(false)">Cancel</button>
+                                <button class="btn btn-primary" id="generate-review-btn" onclick="generateAlignmentReview()">Compare &amp; Review</button>
+                            </div>
+                        </div>
+
+                        <div class="alignment-review" id="alignment-review" style="display:none;">
+                            <div class="review-heading">
+                                <div><h3>Review proposed lyrics</h3><p id="alignment-summary"></p></div>
+                                <div class="auto-align-actions">
+                                    <button class="btn btn-ghost" onclick="closeAlignmentReview()">Cancel</button>
+                                    <button class="btn btn-success" onclick="applyAlignmentReview()">Apply to Editor</button>
+                                </div>
+                            </div>
+                            <p class="review-note">Check low-confidence rows and edit any proposal. Applying here does not save the LRC.</p>
+                            <div class="review-table" id="alignment-review-rows"></div>
+                        </div>
+
+                        <div class="editor-columns">
+                            <!-- Left column: timestamps + original text (read-only) -->
+                            <div class="editor-col">
+                                <h3 class="col-title">Original Transcription <span class="col-badge">read-only</span>
+                                </h3>
+                                <div class="timestamps-panel" id="timestamps-panel"></div>
+                            </div>
+
+                            <!-- Right column: editable lyrics -->
+                            <div class="editor-col">
+                                <h3 class="col-title">Your Corrected Lyrics <span
+                                        class="col-badge edit-badge">editable</span></h3>
+                                <textarea id="lyrics-editor" class="lyrics-textarea"
+                                    placeholder="Edit the lyrics here — one line per timestamp row on the left."
+                                    spellcheck="false"></textarea>
+                                <p class="line-count-hint" id="line-count-hint"></p>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+
+            </div>
+        </section>
+
+        <!-- ================================================================
+             TAB 3: Sync Tester
+        ================================================================ -->
+        <section class="tab-panel" id="panel-tester" role="tabpanel" style="display:none;">
+            <div class="panel-inner tester-layout">
+
+                <!-- Setup card -->
+                <div class="card tester-setup-card">
+                    <h2 class="card-title">🎧 Sync Tester Setup</h2>
+
+                    <!-- LRC picker -->
+                    <div class="tester-field">
+                        <label class="tester-label">LRC File <span class="col-badge">_modified</span></label>
+                        <div class="tester-select-row">
+                            <select id="tester-lrc-select" class="tester-select">
+                                <option value="">— select a file —</option>
+                            </select>
+                            <button class="btn btn-ghost icon-btn" title="Refresh list"
+                                onclick="loadTesterLrcList()">↻</button>
+                        </div>
+                        <p class="tester-hint">From <code>C:\Users\User\Music</code> (*_modified.lrc)</p>
+                    </div>
+
+                    <!-- MP3 pick -->
+                    <div class="tester-field">
+                        <label class="tester-label">MP3 File</label>
+                        <div class="tester-select-row">
+                            <select id="tester-mp3-select" class="tester-select">
+                                <option value="">— select a file —</option>
+                            </select>
+                            <button class="btn btn-ghost icon-btn" title="Refresh list"
+                                onclick="loadTesterMp3List()">↻</button>
+                        </div>
+                        <p class="tester-hint">From <code>C:\Users\User\Music</code> (*.mp3)</p>
+                    </div>
+
+                    <!-- Divider -->
+                    <div class="tester-divider">
+                        <span>or upload custom files</span>
+                    </div>
+
+                    <!-- Custom LRC upload -->
+                    <div class="tester-field">
+                        <label class="tester-label">Custom LRC File</label>
+                        <label class="tester-file-label" id="custom-lrc-label">
+                            <input type="file" id="custom-lrc-input" accept=".lrc" hidden
+                                onchange="onCustomLrcPicked(this)">
+                            <span class="tester-file-icon">📄</span>
+                            <span id="custom-lrc-name">Browse .lrc file…</span>
+                        </label>
+                    </div>
+
+                    <!-- Custom MP3 upload -->
+                    <div class="tester-field">
+                        <label class="tester-label">Custom MP3 File</label>
+                        <label class="tester-file-label" id="mp3-label">
+                            <input type="file" id="tester-mp3-input" accept=".mp3" hidden onchange="onMp3Picked(this)">
+                            <span class="tester-file-icon">🎵</span>
+                            <span id="tester-mp3-name">Browse .mp3 file…</span>
+                        </label>
+                    </div>
+
+                    <!-- Load button -->
+                    <button class="btn btn-primary tester-load-btn" id="tester-load-btn" onclick="loadTesterFiles()">
+                        <span class="btn-icon">▶</span> Load &amp; Play
+                    </button>
+
+                    <!-- Status -->
+                    <p class="tester-status" id="tester-status"></p>
+                </div>
+
+                <!-- Player card -->
+                <div class="card tester-player-card" id="tester-player-card">
+
+                    <!-- Empty state -->
+                    <div class="tester-empty" id="tester-empty">
+                        <span class="editor-empty-icon">🎵</span>
+                        <p>Load an MP3 + LRC file to start testing sync</p>
+                    </div>
+
+                    <!-- Player (hidden until loaded) -->
+                    <div class="tester-player-content" id="tester-player-content" style="display:none;">
+
+                        <!-- Song info bar -->
+                        <div class="tester-song-bar">
+                            <div class="tester-song-info">
+                                <span class="tester-song-icon">🎵</span>
+                                <div>
+                                    <div class="tester-song-title" id="tester-song-title">—</div>
+                                    <div class="tester-song-sub" id="tester-song-lrc">—</div>
+                                </div>
+                            </div>
+                            <div class="tester-line-badge" id="tester-line-badge">Line — / —</div>
+                        </div>
+
+                        <!-- Tools panel (Offset & Tap to Stamp) -->
+                        <div class="tester-tools-panel" id="tester-tools-panel">
+                            <div class="tools-group">
+                                <label class="tools-label">Global Offset</label>
+                                <div class="offset-controls">
+                                    <button class="btn btn-ghost icon-btn" id="offset-minus-btn" title="-0.1s" onclick="adjustGlobalOffset(-0.1)">-0.1s</button>
+                                    <span class="offset-val" id="global-offset-val">0.0s</span>
+                                    <button class="btn btn-ghost icon-btn" id="offset-plus-btn" title="+0.1s" onclick="adjustGlobalOffset(0.1)">+0.1s</button>
+                                </div>
+                            </div>
+                            
+                            <div class="tools-group">
+                                <label class="tools-label">Tap to Stamp</label>
+                                <button class="btn btn-ghost" id="tap-mode-btn" onclick="toggleTapMode()">
+                                    <span class="btn-icon">🎯</span> Off
+                                </button>
+                                <span class="tools-hint" id="tap-mode-hint" style="display:none;">Click a line, press <strong>Enter</strong></span>
+                            </div>
+
+                            <div class="tools-group tools-right">
+                                <button class="btn btn-success" id="tester-save-lrc-btn" onclick="saveTesterLrc()">
+                                    💾 Overwrite LRC
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Audio element -->
+                        <audio id="tester-audio" class="tester-audio" controls>
+                            Your browser does not support the audio element.
+                        </audio>
+
+                        <!-- Lyrics karaoke display -->
+                        <div class="tester-lyrics-wrap" id="tester-lyrics-wrap">
+                            <!-- Lines rendered by JS -->
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ================================================================
+             TAB 4: Tag Manager
+        ================================================================ -->
+        <section class="tab-panel" id="panel-tags" role="tabpanel" style="display:none;">
+            <div class="panel-inner tags-layout">
+
+                <!-- Left sidebar: MP3 file list -->
+                <aside class="editor-sidebar card tags-sidebar" id="tags-sidebar">
+                    <div class="sidebar-header">
+                        <h2 class="card-title">MP3 Files</h2>
+                        <div class="sidebar-header-actions">
+                            <span class="file-count-badge" id="tags-count-badge" style="display:none;"></span>
+                            <button class="btn btn-ghost icon-btn" title="Refresh" onclick="loadTagMp3List()">↻</button>
+                        </div>
+                    </div>
+                    <div class="sidebar-search-wrap">
+                        <span class="search-icon">🔍</span>
+                        <input type="search" id="tags-search" class="lrc-search-input" placeholder="Filter files…"
+                            oninput="filterTagList(this.value)" autocomplete="off">
+                    </div>
+                    <div class="lrc-list" id="tags-mp3-list">
+                        <p class="empty-state">Loading MP3 files…</p>
+                    </div>
+                </aside>
+
+                <!-- Resize handle -->
+                <div class="sidebar-resizer" id="tags-sidebar-resizer" title="Drag to resize"></div>
+
+                <!-- Right: Tag Editor -->
+                <main class="editor-main card tags-main" id="tags-main">
+
+                    <!-- Empty state -->
+                    <div class="editor-empty" id="tags-empty">
+                        <span class="editor-empty-icon">←</span>
+                        <p>Select an MP3 to view and edit its tags</p>
+                    </div>
+
+                    <!-- Editor content -->
+                    <div class="tags-content" id="tags-content" style="display:none;">
+
+                        <!-- Top bar -->
+                        <div class="editor-top-bar">
+                            <span class="editor-filename" id="tags-filename"></span>
+                            <div style="display:flex;gap:0.5rem;">
+                                <button class="btn btn-ghost" id="tags-rename-btn" onclick="renameTagFile()" title="Rename to Artist - Title.mp3">
+                                    ✏️ Rename
+                                </button>
+                                <button class="btn btn-success" id="tags-save-btn" onclick="saveTags()">
+                                    💾 Save Tags
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Two-column: cover + form -->
+                        <div class="tags-editor-body">
+
+                            <!-- Cover art column -->
+                            <div class="tags-cover-col">
+                                <div class="cover-art-wrap" id="cover-art-wrap">
+                                    <img id="cover-art-img" src="" alt="Cover Art" style="display:none;">
+                                    <div class="cover-art-placeholder" id="cover-placeholder">
+                                        <span>🎵</span>
+                                        <span>No Cover</span>
+                                    </div>
+                                </div>
+                                <label class="btn btn-ghost cover-upload-btn">
+                                    <input type="file" id="cover-file-input" accept="image/*" hidden
+                                        onchange="onCoverPicked(this)">
+                                    📷 Change Cover
+                                </label>
+                                <button class="btn btn-ghost cover-upload-btn" id="cover-remove-btn"
+                                    onclick="removeCover()" style="display:none;">✕ Remove</button>
+                            </div>
+
+                            <!-- Tag fields -->
+                            <div class="tags-fields-col">
+                                <div class="tag-field-group">
+                                    <label class="tag-label" for="tag-title">Title</label>
+                                    <input type="text" id="tag-title" class="tag-input" placeholder="Song title">
+                                </div>
+                                <div class="tag-field-group">
+                                    <label class="tag-label" for="tag-artist">Artist</label>
+                                    <input type="text" id="tag-artist" class="tag-input" placeholder="Artist name">
+                                </div>
+                                <div class="tag-field-group">
+                                    <label class="tag-label" for="tag-album">Album</label>
+                                    <input type="text" id="tag-album" class="tag-input" placeholder="Album name">
+                                </div>
+                                <div class="tags-row-2">
+                                    <div class="tag-field-group">
+                                        <label class="tag-label" for="tag-year">Year</label>
+                                        <input type="text" id="tag-year" class="tag-input" placeholder="2024" maxlength="4">
+                                    </div>
+                                    <div class="tag-field-group">
+                                        <label class="tag-label" for="tag-genre">Genre</label>
+                                        <input type="text" id="tag-genre" class="tag-input" placeholder="Pop, Rock…">
+                                    </div>
+                                </div>
+
+                                <!-- Status message -->
+                                <p class="tester-status" id="tags-status"></p>
+                            </div>
+                        </div>
+
+                        <!-- Search / auto-fill section -->
+                        <div class="tags-autofill-section">
+
+                            <!-- iTunes / metadata search -->
+                            <div class="tags-autofill-block">
+                                <h3 class="tags-section-title">🔍 Search Metadata (iTunes)</h3>
+                                <div class="tags-search-row">
+                                    <input type="text" id="meta-search-input" class="tag-input"
+                                        placeholder="Artist name, song title…"
+                                        onkeydown="if(event.key==='Enter') searchTagMetadata()">
+                                    <button class="btn btn-primary" id="meta-search-btn"
+                                        onclick="searchTagMetadata()">Search</button>
+                                </div>
+                                <div class="meta-results" id="meta-results"></div>
+                            </div>
+
+                            <!-- YouTube / Bilibili link fallback -->
+                            <div class="tags-autofill-block">
+                                <h3 class="tags-section-title">▶ YouTube / Bilibili Link (extract metadata)</h3>
+                                <div class="tags-search-row">
+                                    <input type="url" id="yt-url-input" class="tag-input"
+                                        placeholder="https://www.youtube.com/watch?v=… or https://www.bilibili.com/video/…"
+                                        onkeydown="if(event.key==='Enter') fetchYoutubeMeta()">
+                                    <button class="btn btn-primary" id="yt-fetch-btn"
+                                        onclick="fetchYoutubeMeta()">Fetch</button>
+                                </div>
+                                <p class="tester-hint" style="margin-top:0.4rem">Supports YouTube, Bilibili, and <a href="https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md" target="_blank" style="color:var(--accent)">1000+ sites</a>. No download — metadata only.</p>
+                                <p class="tester-status" id="yt-status"></p>
+                            </div>
+
+                        </div>
+                    </div>
+                </main>
+
+            </div>
+        </section>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+
+</html>

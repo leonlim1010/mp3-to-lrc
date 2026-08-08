@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.git
+.gitignore
+test_*.py
+test_*.mp3
+id3_debug.txt
+*.bat
