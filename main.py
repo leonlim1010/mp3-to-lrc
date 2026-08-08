@@ -19,8 +19,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Request, Body
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
-import whisper
-import torch
 
 # mutagen – ID3 tag read/write
 try:
@@ -82,10 +80,12 @@ IS_CLOUD = bool(os.environ.get("RENDER") or os.environ.get("PORT") or os.environ
 
 if IS_CLOUD:
     MUSIC_DIR = Path(tempfile.gettempdir()) / "music_lrc"
-    print(f"Running in CLOUD mode. Using output directory: {MUSIC_DIR}")
+    _model_size = "tiny"  # Lightweight model (75MB) for 512MB RAM Cloud Free Tiers
+    print(f"Running in CLOUD mode. Using output directory: {MUSIC_DIR}, model: {_model_size}")
 else:
     MUSIC_DIR = Path(r"C:\Users\User\Music")
-    print(f"Running in LOCAL mode. Using Music directory: {MUSIC_DIR}")
+    _model_size = "small"  # Full model for local PC
+    print(f"Running in LOCAL mode. Using Music directory: {MUSIC_DIR}, model: {_model_size}")
 
 MUSIC_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -110,19 +110,27 @@ def setup_ffmpeg():
 setup_ffmpeg()
 
 # ---------------------------------------------------------------------------
-# Whisper model — lazy loaded on first use
+# Whisper model — lazy loaded on first use to save memory at startup
 # ---------------------------------------------------------------------------
-device = "cuda" if torch.cuda.is_available() else "cpu"
 _model = None
-_model_size = "small"
 
 
 def get_model():
     global _model, _model_size
     if _model is None:
-        print(f"Loading Whisper model ({_model_size}) on {device}...")
-        _model = whisper.load_model(_model_size, device=device)
-        print("Whisper model loaded.")
+        try:
+            import torch
+            import whisper
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            print(f"Loading Whisper model ({_model_size}) on {device}...")
+            _model = whisper.load_model(_model_size, device=device)
+            print("Whisper model loaded successfully.")
+        except Exception as e:
+            print(f"ERROR loading Whisper model: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Could not load AI model: {str(e)}. Cloud server RAM may be constrained."
+            )
     return _model
 
 
