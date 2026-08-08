@@ -76,16 +76,14 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 # ---------------------------------------------------------------------------
 # Dynamic Environment Setup (Local PC vs Cloud)
 # ---------------------------------------------------------------------------
-IS_CLOUD = bool(os.environ.get("RENDER") or os.environ.get("PORT") or os.environ.get("IS_CLOUD"))
+IS_CLOUD = bool(os.environ.get("RENDER") or os.environ.get("IS_CLOUD"))
 
 if IS_CLOUD:
     MUSIC_DIR = Path(tempfile.gettempdir()) / "music_lrc"
-    _model_size = "tiny"  # Lightweight model (75MB) for 512MB RAM Cloud Free Tiers
-    print(f"Running in CLOUD mode. Using output directory: {MUSIC_DIR}, model: {_model_size}")
+    print(f"Running in CLOUD mode. Using Groq API for transcription. Output: {MUSIC_DIR}")
 else:
     MUSIC_DIR = Path(r"C:\Users\User\Music")
-    _model_size = "small"  # Full model for local PC
-    print(f"Running in LOCAL mode. Using Music directory: {MUSIC_DIR}, model: {_model_size}")
+    print(f"Running in LOCAL mode. Using local Whisper. Music directory: {MUSIC_DIR}")
 
 MUSIC_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -110,28 +108,70 @@ def setup_ffmpeg():
 setup_ffmpeg()
 
 # ---------------------------------------------------------------------------
-# Whisper model — lazy loaded on first use to save memory at startup
+# Local Whisper model — lazy loaded only in LOCAL mode
 # ---------------------------------------------------------------------------
 _model = None
+_model_size = "small"
 
 
-def get_model():
+def get_local_model():
     global _model, _model_size
     if _model is None:
         try:
             import torch
-            import whisper
+            import whisper as _whisper
             device = "cuda" if torch.cuda.is_available() else "cpu"
             print(f"Loading Whisper model ({_model_size}) on {device}...")
-            _model = whisper.load_model(_model_size, device=device)
+            _model = _whisper.load_model(_model_size, device=device)
             print("Whisper model loaded successfully.")
         except Exception as e:
             print(f"ERROR loading Whisper model: {e}")
+            raise HTTPException(status_code=500, detail=f"Could not load AI model: {str(e)}")
+    return _model
+
+
+def transcribe_audio(tmp_path: str) -> list:
+    """
+    Unified transcription dispatcher.
+    - CLOUD: uses Groq Whisper API (zero RAM, free, fast, high quality)
+    - LOCAL: uses local openai-whisper model
+    Returns a list of segment dicts with 'start' and 'text' keys.
+    """
+    if IS_CLOUD:
+        api_key = os.environ.get("GROQ_API_KEY")
+        if not api_key:
             raise HTTPException(
                 status_code=500,
-                detail=f"Could not load AI model: {str(e)}. Cloud server RAM may be constrained."
+                detail=(
+                    "GROQ_API_KEY environment variable is not set. "
+                    "Get a free key at console.groq.com and add it to Render Environment Variables."
+                )
             )
-    return _model
+        try:
+            from groq import Groq
+            client = Groq(api_key=api_key)
+            print("Sending audio to Groq Whisper API...")
+            with open(tmp_path, "rb") as audio_file:
+                transcription = client.audio.transcriptions.create(
+                    file=(os.path.basename(tmp_path), audio_file),
+                    model="whisper-large-v3-turbo",
+                    response_format="verbose_json",
+                    timestamp_granularities=["segment"]
+                )
+            segments = getattr(transcription, "segments", None) or []
+            print(f"Groq transcription complete. Got {len(segments)} segments.")
+            # Normalise to same dict format as local Whisper
+            return [{"start": s.start, "text": s.text} for s in segments]
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"Groq API error: {e}")
+            raise HTTPException(status_code=500, detail=f"Groq transcription failed: {str(e)}")
+    else:
+        model = get_local_model()
+        is_cuda = getattr(model, "device", None) and getattr(model.device, "type", "") == "cuda"
+        result = model.transcribe(tmp_path, word_timestamps=False, fp16=is_cuda)
+        return result.get("segments", [])
 
 
 # ---------------------------------------------------------------------------
@@ -279,10 +319,7 @@ async def transcribe(audio_file: UploadFile = File(...)):
             tmp_path = tmp.name
 
         print(f"Transcribing: {audio_file.filename}")
-        model = get_model()
-        is_cuda = getattr(model, "device", None) and getattr(model.device, "type", "") == "cuda"
-        result = model.transcribe(tmp_path, word_timestamps=False, fp16=is_cuda)
-        segments = result.get("segments", [])
+        segments = transcribe_audio(tmp_path)
         print(f"Got {len(segments)} segments.")
 
         lrc_content = segments_to_lrc(segments)

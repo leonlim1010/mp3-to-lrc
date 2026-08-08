@@ -1,9 +1,7 @@
 fastapi
 uvicorn
 python-multipart
-openai-whisper
-torch
+groq
 numpy
 mutagen
 yt-dlp
-groq
