@@ -69,9 +69,11 @@ async def lifespan(app_: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
 
 # Mount static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # ---------------------------------------------------------------------------
 # Dynamic Environment Setup (Local PC vs Cloud)
