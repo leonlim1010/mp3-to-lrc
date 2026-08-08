@@ -16,7 +16,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Set working directory
 WORKDIR /app
 
-# Copy dependencies list and install
+# Install lightweight CPU-only PyTorch (saves ~4GB of CUDA bloat)
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
+# Copy dependencies list and install remaining packages
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 

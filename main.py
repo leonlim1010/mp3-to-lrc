@@ -242,16 +242,24 @@ def _map_token_boundaries(original_keys: list, reference_keys: list) -> list:
 # Endpoints
 # ---------------------------------------------------------------------------
 
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "mode": "cloud" if IS_CLOUD else "local"}
+
+
 @app.get("/")
 async def read_index():
-    return FileResponse("static/index.html")
+    index_file = STATIC_DIR / "index.html"
+    if not index_file.exists():
+        raise HTTPException(status_code=404, detail=f"index.html not found at {index_file}")
+    return FileResponse(index_file)
 
 
 @app.post("/transcribe")
 async def transcribe(audio_file: UploadFile = File(...)):
     """
     Transcribe a single MP3 file with Whisper.
-    Saves the resulting LRC to C:\\Users\\User\\Music\\<stem>.lrc
+    Saves the resulting LRC to MUSIC_DIR/<stem>.lrc
     Returns {filename, lrc_path, lines_count}.
     """
     if not audio_file.filename.lower().endswith(".mp3"):
@@ -270,7 +278,8 @@ async def transcribe(audio_file: UploadFile = File(...)):
 
         print(f"Transcribing: {audio_file.filename}")
         model = get_model()
-        result = model.transcribe(tmp_path, word_timestamps=False, fp16=(device == "cuda"))
+        is_cuda = getattr(model, "device", None) and getattr(model.device, "type", "") == "cuda"
+        result = model.transcribe(tmp_path, word_timestamps=False, fp16=is_cuda)
         segments = result.get("segments", [])
         print(f"Got {len(segments)} segments.")
 
@@ -332,7 +341,7 @@ async def save_modified(
     corrected_lyrics: str = Form(...)
 ):
     """
-    Merge correct lyrics (one line per \\n) with timestamps from the original
+    Merge correct lyrics (one line per \n) with timestamps from the original
     LRC file, save as <stem>_modified.lrc, then delete the original.
     """
     lrc_path = MUSIC_DIR / filename

@@ -2,7 +2,6 @@ fastapi
 uvicorn
 python-multipart
 openai-whisper
-torch
 numpy
 mutagen
 yt-dlp
