@@ -242,11 +242,13 @@ def _map_token_boundaries(original_keys: list, reference_keys: list) -> list:
 # Endpoints
 # ---------------------------------------------------------------------------
 
+@app.head("/health")
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "mode": "cloud" if IS_CLOUD else "local"}
 
 
+@app.head("/")
 @app.get("/")
 async def read_index():
     index_file = STATIC_DIR / "index.html"
