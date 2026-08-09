@@ -13,17 +13,6 @@
         return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
     }
 
-    // Serialize auth work inside this page without relying on navigator.locks.
-    // The timeout is inside the lock so one stalled operation cannot block every
-    // later sign-in or sign-out attempt.
-    let authQueue = Promise.resolve();
-    function browserSafeLock(_name, _acquireTimeout, operation) {
-        const run = () => withTimeout(Promise.resolve().then(operation), 30000, 'Authentication');
-        const result = authQueue.then(run, run);
-        authQueue = result.catch(() => undefined);
-        return result;
-    }
-
     const ready = (async () => {
         config = await withTimeout(
             nativeFetch('/api/config', { cache: 'no-store' }).then(response => {
@@ -41,8 +30,7 @@
                 persistSession: true,
                 autoRefreshToken: true,
                 detectSessionInUrl: true,
-                storageKey: 'soniscript-auth-v2',
-                lock: browserSafeLock
+                storageKey: 'soniscript-auth-v2'
             }
         });
         document.getElementById('account-status').textContent = 'Starting guest session...';
@@ -62,9 +50,12 @@
             updateAccountUi(session && session.user, true);
         });
     })().catch(error => {
-        initError = error;
+        // A created client can still perform Google/email login even when
+        // automatic guest restoration failed. Only configuration/SDK failures
+        // should disable every account action.
+        initError = client ? null : error;
         console.error('Account initialization failed:', error);
-        updateAccountUi(null, false, error.message);
+        updateAccountUi(null, Boolean(client), error.message);
     });
 
     window.authReady = ready;
@@ -93,8 +84,8 @@
             return;
         }
         if (!user) {
-            status.textContent = 'Starting guest session...';
-            button.textContent = 'Please wait';
+            status.textContent = error ? 'Guest unavailable' : 'Starting guest session...';
+            button.textContent = error ? 'Sign in' : 'Please wait';
             return;
         }
         const anonymous = Boolean(user && user.is_anonymous);
@@ -197,8 +188,24 @@
         } finally {
             session = null;
             try { localStorage.removeItem('soniscript-auth-v2'); } catch (_) {}
-            const separator = window.location.pathname.includes('?') ? '&' : '?';
-            window.location.replace(`${window.location.pathname}${separator}signed_out=${Date.now()}`);
+        }
+
+        // Move directly into a new guest session. This avoids a full reload,
+        // removes the "starting guest" flicker, and keeps Google available if
+        // guest creation itself is temporarily unavailable.
+        updateAccountUi(null, true);
+        try {
+            const anonymous = await withTimeout(
+                client.auth.signInAnonymously(), 30000, 'Guest sign-in'
+            );
+            if (anonymous.error) throw anonymous.error;
+            session = anonymous.data.session;
+            updateAccountUi(session.user, true);
+            showAuthMessage('Signed out. You are now using guest mode.');
+            setTimeout(closeAccountModal, 500);
+        } catch (error) {
+            updateAccountUi(null, true, error.message);
+            showAuthMessage(`Signed out, but guest mode could not start: ${error.message}`, true);
         }
     };
     function showAuthMessage(text, error = false) {
