@@ -5,6 +5,26 @@
     let config = null;
     let initError = null;
 
+    // Capture this before Supabase removes OAuth tokens from the URL.
+    const authCallback = (() => {
+        const query = new URLSearchParams(window.location.search);
+        const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        return query.has('code') || query.has('error') || query.has('error_description') ||
+            hash.has('access_token') || hash.has('refresh_token') || hash.has('error') ||
+            hash.has('error_description');
+    })();
+
+    function callbackError() {
+        const query = new URLSearchParams(window.location.search);
+        const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        return query.get('error_description') || hash.get('error_description') ||
+            query.get('error') || hash.get('error');
+    }
+
+    function clearAuthCallbackUrl() {
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     function withTimeout(promise, milliseconds, label) {
         let timer;
         const timeout = new Promise((_, reject) => {
@@ -33,6 +53,38 @@
                 storageKey: 'soniscript-auth-v2'
             }
         });
+
+        // Supabase completes redirected OAuth asynchronously during client
+        // initialization. Subscribe immediately so that event cannot be missed.
+        let resolveCallbackSession;
+        const callbackSession = new Promise(resolve => { resolveCallbackSession = resolve; });
+        client.auth.onAuthStateChange((_event, nextSession) => {
+            session = nextSession;
+            if (nextSession) {
+                // An identity-link callback may briefly expose the old guest
+                // session. Keep waiting until the Google identity is applied.
+                if (!authCallback || !nextSession.user.is_anonymous) {
+                    resolveCallbackSession(nextSession);
+                    updateAccountUi(nextSession.user, true);
+                }
+            } else if (!authCallback) {
+                updateAccountUi(null, true);
+            }
+        });
+
+        if (authCallback) {
+            document.getElementById('account-status').textContent = 'Completing Google sign-in...';
+            const oauthError = callbackError();
+            if (oauthError) {
+                clearAuthCallbackUrl();
+                throw new Error(oauthError);
+            }
+            session = await withTimeout(callbackSession, 30000, 'Google sign-in completion');
+            clearAuthCallbackUrl();
+            updateAccountUi(session.user, true);
+            return;
+        }
+
         document.getElementById('account-status').textContent = 'Starting guest session...';
         const current = await withTimeout(client.auth.getSession(), 10000, 'Session check');
         if (current.error) throw current.error;
@@ -45,10 +97,6 @@
             session = anonymous.data.session;
         }
         updateAccountUi(session.user, true);
-        client.auth.onAuthStateChange((_event, nextSession) => {
-            session = nextSession;
-            updateAccountUi(session && session.user, true);
-        });
     })().catch(error => {
         // A created client can still perform Google/email login even when
         // automatic guest restoration failed. Only configuration/SDK failures
