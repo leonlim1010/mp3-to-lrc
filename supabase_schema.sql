@@ -45,9 +45,14 @@ create policy "owners delete lrc" on public.lrc_files for delete
            (coalesce(((select auth.jwt())->>'is_anonymous')::boolean, false) is false
             or created_at >= now() - interval '7 days'));
 
+create schema if not exists private;
+revoke all on schema private from public, anon;
+grant usage on schema private to authenticated;
+
 drop function if exists public.reserve_transcription(integer);
-create or replace function public.reserve_transcription(p_audio_seconds integer, p_request_key text)
-returns jsonb language plpgsql security definer set search_path = public as $$
+drop function if exists public.reserve_transcription(integer, text);
+create or replace function private.reserve_transcription(p_audio_seconds integer, p_request_key text)
+returns jsonb language plpgsql security definer set search_path = pg_catalog, public as $$
 declare
     uid uuid := auth.uid();
     anonymous boolean := coalesce((auth.jwt()->>'is_anonymous')::boolean, false);
@@ -78,6 +83,13 @@ begin
                               'remaining', request_limit - used - 1);
 end $$;
 
+revoke all on function private.reserve_transcription(integer, text) from public, anon;
+grant execute on function private.reserve_transcription(integer, text) to authenticated;
+
+create function public.reserve_transcription(p_audio_seconds integer, p_request_key text)
+returns jsonb language sql security invoker set search_path = pg_catalog, private as $$
+    select private.reserve_transcription(p_audio_seconds, p_request_key)
+$$;
 revoke all on function public.reserve_transcription(integer, text) from public;
 revoke all on function public.reserve_transcription(integer, text) from anon;
 grant execute on function public.reserve_transcription(integer, text) to authenticated;
@@ -97,8 +109,6 @@ create index if not exists transcription_usage_request_created_idx
     on public.transcription_usage(request_key, created_at desc);
 
 drop policy if exists "usage hidden from clients" on public.transcription_usage;
-create policy "usage hidden from clients" on public.transcription_usage
-    as restrictive for all to authenticated using (false) with check (false);
 
 -- Guest cleanup: run periodically with Supabase Cron if desired.
 -- delete from public.lrc_files f using auth.users u
