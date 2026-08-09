@@ -79,6 +79,85 @@ function setFileStatus(index, cls, text) {
     el.textContent = text;
 }
 
+let usageRequest = null;
+
+function formatUsageDuration(seconds) {
+    const total = Math.max(0, Number(seconds) || 0);
+    if (total < 60) return `${total}s`;
+    const minutes = Math.floor(total / 60);
+    const remainder = total % 60;
+    return remainder ? `${minutes}m ${remainder}s` : `${minutes}m`;
+}
+
+function formatResetCountdown(resetAt) {
+    const milliseconds = new Date(resetAt).getTime() - Date.now();
+    if (milliseconds <= 0) return 'Resetting now';
+    const totalMinutes = Math.ceil(milliseconds / 60000);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `Resets in ${hours}h ${minutes}m (${new Date(resetAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`;
+}
+
+function renderUsage(data) {
+    const usedPercent = data.limit ? Math.min(100, Math.round(data.used / data.limit * 100)) : 0;
+    document.getElementById('usage-account-label').textContent = data.account_type === 'guest'
+        ? 'Guest allowance · private to this browser session'
+        : 'Signed-in allowance · private to your account';
+    document.getElementById('usage-remaining').textContent = `${data.remaining} of ${data.limit}`;
+    document.getElementById('usage-used').textContent = `${data.used} of ${data.limit}`;
+    document.getElementById('usage-audio').textContent = formatUsageDuration(data.audio_seconds_today);
+    document.getElementById('usage-max').textContent = formatUsageDuration(data.max_audio_seconds);
+    document.getElementById('usage-progress-bar').style.width = `${usedPercent}%`;
+    document.getElementById('usage-progress').setAttribute('aria-valuenow', String(usedPercent));
+    document.getElementById('usage-reset').textContent = formatResetCountdown(data.reset_at);
+    document.getElementById('usage-files').textContent = String(data.saved_files);
+    document.getElementById('usage-storage').textContent = data.retention_days
+        ? `Expires after ${data.retention_days} days`
+        : 'Private · kept until deleted';
+    if (data.next_expiry_at) {
+        document.getElementById('usage-storage').textContent += ` · next ${new Date(data.next_expiry_at).toLocaleDateString()}`;
+    }
+
+    const shared = data.shared_service;
+    const status = document.getElementById('usage-service-status');
+    status.textContent = shared.status;
+    status.className = `service-status ${shared.status === 'Busy' ? 'busy' : shared.status === 'Limit reached' ? 'limited' : ''}`;
+    document.getElementById('usage-hour').textContent = `${shared.hourly_percent}%`;
+    document.getElementById('usage-day').textContent = `${shared.daily_percent}%`;
+    document.getElementById('usage-hour-bar').style.width = `${shared.hourly_percent}%`;
+    document.getElementById('usage-day-bar').style.width = `${shared.daily_percent}%`;
+    document.getElementById('usage-loading').hidden = true;
+    document.getElementById('usage-error').hidden = true;
+    document.getElementById('usage-content').hidden = false;
+}
+
+async function loadUsage() {
+    if (usageRequest) return usageRequest;
+    const refresh = document.getElementById('usage-refresh');
+    const error = document.getElementById('usage-error');
+    if (refresh) refresh.disabled = true;
+    usageRequest = (async () => {
+        try {
+            const response = await fetch('/api/usage', { cache: 'no-store' });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.detail || 'Usage information is unavailable.');
+            renderUsage(data);
+        } catch (problem) {
+            document.getElementById('usage-loading').hidden = true;
+            error.textContent = problem.message;
+            error.hidden = false;
+        } finally {
+            usageRequest = null;
+            if (refresh) refresh.disabled = false;
+        }
+    })();
+    return usageRequest;
+}
+
+window.loadUsage = loadUsage;
+window.addEventListener('soniscript-auth-change', loadUsage);
+if (window.authReady) window.authReady.then(loadUsage);
+
 function clearQueue() {
     queuedFiles = [];
     fileQueue.innerHTML = '';
@@ -109,6 +188,7 @@ async function transcribeAll() {
             }
             const data = await res.json();
             setFileStatus(i, 'status-done', `Saved ...(${data.lines_count} lines)`);
+            loadUsage();
         } catch (err) {
             console.error(err);
             setFileStatus(i, 'status-error', `Error: ${err.message}`);
@@ -117,6 +197,7 @@ async function transcribeAll() {
 
     transcribeBtn.disabled = false;
     document.getElementById('clear-queue-btn').disabled = false;
+    loadUsage();
 }
 
 // ---------------------------------------------------------------------------

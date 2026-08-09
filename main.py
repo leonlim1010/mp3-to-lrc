@@ -15,6 +15,7 @@ import difflib
 import unicodedata
 import math
 import hashlib
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 from contextlib import asynccontextmanager
@@ -324,6 +325,29 @@ async def public_config():
             "max_file_mb": 25,
         },
     }
+
+
+@app.get("/api/usage")
+async def usage_status(request: Request):
+    """Private per-user quota plus rounded, non-identifying service estimates."""
+    if not (IS_CLOUD and cloud_store.ENABLED):
+        raise HTTPException(status_code=503, detail="Usage tracking is available in cloud mode.")
+    who = cloud_store.identity(request)
+    usage = cloud_store.usage_status(who)
+    hourly_limit = max(1, int(os.environ.get("GROQ_AUDIO_HOURLY_LIMIT", "7200")))
+    daily_limit = max(1, int(os.environ.get("GROQ_AUDIO_DAILY_LIMIT", "28800")))
+    hourly_percent = min(100, round(100 * usage.pop("shared_hour_seconds", 0) / hourly_limit))
+    daily_percent = min(100, round(100 * usage.pop("shared_day_seconds", 0) / daily_limit))
+    highest = max(hourly_percent, daily_percent)
+    usage["shared_service"] = {
+        "status": "Limit reached" if highest >= 100 else "Busy" if highest >= 85 else "Available",
+        "hourly_percent": hourly_percent,
+        "daily_percent": daily_percent,
+        "estimated": True,
+    }
+    usage["account_type"] = "guest" if who.is_anonymous else "registered"
+    usage["updated_at"] = datetime.now(timezone.utc).isoformat()
+    return usage
 
 
 @app.head("/")

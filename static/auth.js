@@ -158,6 +158,7 @@
                 ? `${limits.daily} transcriptions/day · ${limits.max_minutes} min each · files expire after ${limits.retention_days} days`
                 : `${limits.daily} transcriptions/day · ${limits.max_minutes} min each · private permanent library`;
         }
+        window.dispatchEvent(new CustomEvent('soniscript-auth-change'));
     }
 
     const authCopy = {

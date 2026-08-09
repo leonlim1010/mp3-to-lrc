@@ -94,6 +94,57 @@ revoke all on function public.reserve_transcription(integer, text) from public;
 revoke all on function public.reserve_transcription(integer, text) from anon;
 grant execute on function public.reserve_transcription(integer, text) to authenticated;
 
+create or replace function private.get_usage_status()
+returns jsonb language plpgsql security definer set search_path = pg_catalog, public as $$
+declare
+    uid uuid := auth.uid();
+    anonymous boolean := coalesce((auth.jwt()->>'is_anonymous')::boolean, false);
+    request_limit integer := case when anonymous then 3 else 10 end;
+    duration_limit integer := case when anonymous then 600 else 900 end;
+    used integer;
+    own_audio_seconds bigint;
+    shared_hour_seconds bigint;
+    shared_day_seconds bigint;
+    saved_files integer;
+    next_expiry timestamptz;
+begin
+    if uid is null then raise exception 'Authentication required'; end if;
+    select count(*), coalesce(sum(audio_seconds), 0) into used, own_audio_seconds
+      from public.transcription_usage
+      where user_id = uid and created_at >= date_trunc('day', now());
+    select coalesce(sum(audio_seconds), 0) into shared_hour_seconds
+      from public.transcription_usage where created_at >= now() - interval '1 hour';
+    select coalesce(sum(audio_seconds), 0) into shared_day_seconds
+      from public.transcription_usage where created_at >= date_trunc('day', now());
+    select count(*), min(created_at + interval '7 days') into saved_files, next_expiry
+      from public.lrc_files where user_id = uid
+        and (anonymous is false or created_at >= now() - interval '7 days');
+    return jsonb_build_object(
+        'used', used,
+        'limit', request_limit,
+        'remaining', greatest(request_limit - used, 0),
+        'audio_seconds_today', own_audio_seconds,
+        'max_audio_seconds', duration_limit,
+        'reset_at', date_trunc('day', now()) + interval '1 day',
+        'retention_days', case when anonymous then 7 else null end,
+        'saved_files', saved_files,
+        'next_expiry_at', case when anonymous then next_expiry else null end,
+        'shared_hour_seconds', shared_hour_seconds,
+        'shared_day_seconds', shared_day_seconds
+    );
+end $$;
+
+revoke all on function private.get_usage_status() from public, anon;
+grant execute on function private.get_usage_status() to authenticated;
+
+create or replace function public.get_usage_status()
+returns jsonb language sql security invoker set search_path = pg_catalog, private as $$
+    select private.get_usage_status()
+$$;
+revoke all on function public.get_usage_status() from public;
+revoke all on function public.get_usage_status() from anon;
+grant execute on function public.get_usage_status() to authenticated;
+
 create or replace function public.touch_updated_at() returns trigger
 language plpgsql set search_path = public as $$
 begin new.updated_at = now(); return new; end $$;

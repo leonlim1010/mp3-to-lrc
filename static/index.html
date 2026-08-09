@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SoniScript — MP3 to LRC</title>
     <meta name="description" content="Transcribe MP3 files to LRC and correct lyrics with precise timestamps.">
-    <link rel="stylesheet" href="/static/style.css?v=20260810-2">
+    <link rel="stylesheet" href="/static/style.css?v=20260810-3">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
 </head>
 
@@ -71,6 +71,43 @@
                         <p class="dropzone-sub">Multiple files supported</p>
                         <input type="file" id="file-input" accept=".mp3" multiple hidden>
                     </div>
+                </div>
+
+                <div class="card usage-card" id="usage-card">
+                    <div class="usage-header">
+                        <div>
+                            <h2 class="card-title">Usage &amp; Limits</h2>
+                            <p class="usage-subtitle" id="usage-account-label">Loading your private allowance...</p>
+                        </div>
+                        <button class="btn btn-ghost usage-refresh" id="usage-refresh" onclick="loadUsage()">Refresh</button>
+                    </div>
+                    <div id="usage-loading" class="usage-loading">Checking today’s usage...</div>
+                    <div id="usage-content" hidden>
+                        <div class="usage-stats">
+                            <div class="usage-stat"><span>Remaining today</span><strong id="usage-remaining">—</strong></div>
+                            <div class="usage-stat"><span>Used today</span><strong id="usage-used">—</strong></div>
+                            <div class="usage-stat"><span>Audio processed</span><strong id="usage-audio">—</strong></div>
+                            <div class="usage-stat"><span>Maximum per upload</span><strong id="usage-max">—</strong></div>
+                        </div>
+                        <div class="usage-progress" role="progressbar" aria-label="Daily transcription allowance" aria-valuemin="0" aria-valuemax="100" id="usage-progress">
+                            <span id="usage-progress-bar"></span>
+                        </div>
+                        <p class="usage-reset" id="usage-reset"></p>
+                        <div class="usage-details">
+                            <div class="usage-detail-row"><span>Saved LRC files</span><strong id="usage-files">—</strong></div>
+                            <div class="usage-detail-row"><span>Storage policy</span><strong id="usage-storage">—</strong></div>
+                        </div>
+                        <div class="shared-usage">
+                            <div class="shared-usage-heading">
+                                <span>Shared transcription service</span>
+                                <strong class="service-status" id="usage-service-status">Available</strong>
+                            </div>
+                            <div class="shared-meter-row"><span>Hourly estimate</span><div class="shared-meter"><span id="usage-hour-bar"></span></div><strong id="usage-hour">—</strong></div>
+                            <div class="shared-meter-row"><span>Daily estimate</span><div class="shared-meter"><span id="usage-day-bar"></span></div><strong id="usage-day">—</strong></div>
+                            <p class="usage-estimate-note">Shared figures are estimates from this website’s activity. Groq does not expose exact remaining audio seconds.</p>
+                        </div>
+                    </div>
+                    <p class="usage-error" id="usage-error" hidden></p>
                 </div>
 
                 <!-- File queue -->
@@ -532,8 +569,8 @@
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.2"></script>
-    <script src="/static/auth.js?v=20260810-6"></script>
-    <script src="/static/script.js"></script>
+    <script src="/static/auth.js?v=20260810-7"></script>
+    <script src="/static/script.js?v=20260810-2"></script>
 </body>
 
 </html>

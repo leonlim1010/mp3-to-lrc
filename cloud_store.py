@@ -76,6 +76,12 @@ def reserve_transcription(who: Identity, duration_seconds: int, request_key: str
     )
 
 
+def usage_status(who: Identity):
+    return _request(
+        "/rest/v1/rpc/get_usage_status", who.token, "POST", {}
+    )
+
+
 def save_lrc(who: Identity, filename: str, content: str, status="original"):
     rows = _request(
         "/rest/v1/lrc_files", who.token, "POST",

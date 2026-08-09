@@ -824,6 +824,37 @@ body {
     color: var(--red);
 }
 
+/* Usage and limits */
+.usage-card { padding: 1.25rem 1.4rem; }
+.usage-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.usage-header .card-title { margin-bottom: .2rem; }
+.usage-subtitle, .usage-loading, .usage-reset, .usage-estimate-note { color: var(--text-muted); font-size: .82rem; }
+.usage-refresh { flex: 0 0 auto; }
+.usage-loading { padding: 1rem 0 .25rem; }
+.usage-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .65rem; margin-top: 1rem; }
+.usage-stat { padding: .8rem; border-radius: 10px; background: rgba(255,255,255,.045); border: 1px solid var(--border); }
+.usage-stat span { display: block; color: var(--text-muted); font-size: .74rem; margin-bottom: .25rem; }
+.usage-stat strong { font-size: 1.05rem; }
+.usage-progress, .shared-meter { overflow: hidden; height: 7px; border-radius: 999px; background: rgba(255,255,255,.08); }
+.usage-progress { margin-top: .85rem; }
+.usage-progress > span, .shared-meter > span { display: block; height: 100%; width: 0; border-radius: inherit;
+    background: linear-gradient(90deg, var(--accent), var(--purple)); transition: width .35s ease; }
+.usage-reset { margin-top: .45rem; }
+.usage-details { display: grid; grid-template-columns: 1fr 1fr; gap: .55rem 1.5rem; margin-top: .9rem; }
+.usage-detail-row { display: flex; justify-content: space-between; gap: .8rem; font-size: .83rem; }
+.usage-detail-row span { color: var(--text-muted); }
+.usage-detail-row strong { text-align: right; }
+.shared-usage { padding-top: .9rem; margin-top: .9rem; border-top: 1px solid var(--border); }
+.shared-usage-heading { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: .7rem; }
+.service-status { color: var(--green); font-size: .78rem; }
+.service-status.busy { color: var(--amber); }
+.service-status.limited { color: var(--red); }
+.shared-meter-row { display: grid; grid-template-columns: 105px 1fr 42px; align-items: center; gap: .65rem;
+    margin-top: .45rem; color: var(--text-muted); font-size: .76rem; }
+.shared-meter-row strong { color: var(--text); text-align: right; }
+.usage-estimate-note { margin-top: .7rem; line-height: 1.4; }
+.usage-error { margin-top: .8rem; color: var(--red) !important; }
+
 .header-actions { margin-left: auto; display: flex; align-items: center; gap: .7rem; }
 .account-summary { display: flex; flex-direction: column; max-width: 280px; }
 .account-summary span { font-weight: 600; font-size: .85rem; }
@@ -898,6 +929,10 @@ body {
     .auth-heading { padding: 0 1.25rem; }
     .auth-modal { border-radius: 16px; }
     .modal-row { flex-direction: column; }
+    .usage-card { padding: 1rem; }
+    .usage-stats { grid-template-columns: 1fr 1fr; }
+    .usage-details { grid-template-columns: 1fr; }
+    .shared-meter-row { grid-template-columns: 92px 1fr 38px; gap: .45rem; }
 }
 
 .auto-align-box {
