@@ -830,7 +830,8 @@ body {
 .account-summary small { color: var(--text-muted); white-space: nowrap; font-size: .68rem; }
 
 .modal { width: min(540px, calc(100vw - 2rem)); color: var(--text); background: #17142d;
-    border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 2rem; box-shadow: var(--shadow); }
+    border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 2rem; box-shadow: var(--shadow);
+    margin: auto; position: relative; }
 .modal::backdrop { background: rgba(5, 4, 15, .78); backdrop-filter: blur(5px); }
 .modal h2 { margin-bottom: .7rem; }
 .modal h3 { margin: 1.2rem 0 .4rem; }
@@ -838,7 +839,8 @@ body {
 .modal ol, .modal ul { padding-left: 1.3rem; }
 .modal-close { position: absolute; right: 1rem; top: .7rem; border: 0; background: none;
     color: var(--text-muted); font-size: 1.8rem; cursor: pointer; }
-.btn-google { width: 100%; margin-top: 1.2rem; background: #fff; color: #222; border: 0; justify-content: center; }
+.btn-google { width: 100%; margin-top: 1.2rem; background: #fff; color: #222; border: 0; justify-content: center; gap: .65rem; }
+.btn-google svg { width: 18px; height: 18px; flex: 0 0 18px; }
 .modal-full-btn { width: 100%; justify-content: center; margin-top: .5rem; }
 .modal-divider { display: flex; align-items: center; gap: .8rem; color: var(--text-muted); margin: 1rem 0; }
 .modal-divider::before, .modal-divider::after { content: ''; height: 1px; background: var(--border); flex: 1; }
@@ -848,9 +850,54 @@ body {
 .auth-message.error { color: var(--red) !important; }
 .guide-modal { width: min(720px, calc(100vw - 2rem)); max-height: 85vh; overflow-y: auto; }
 
+.auth-modal { width: min(460px, calc(100vw - 2rem)); max-height: min(760px, calc(100dvh - 2rem)); overflow-y: auto; }
+.auth-heading { text-align: center; margin-bottom: 1.25rem; }
+.auth-heading p { margin-top: .35rem; }
+.auth-logo { width: 46px; height: 46px; margin: 0 auto .8rem; display: grid; place-items: center;
+    border-radius: 14px; color: white; font-size: 1.45rem; background: linear-gradient(135deg, var(--accent), var(--purple));
+    box-shadow: 0 8px 24px var(--accent-glow); }
+.auth-tabs { display: grid; grid-template-columns: 1fr 1fr; padding: 4px; margin-bottom: 1rem;
+    border-radius: 10px; background: rgba(255,255,255,.055); }
+.auth-tab { border: 0; border-radius: 8px; padding: .65rem; color: var(--text-muted); background: transparent;
+    font: inherit; font-weight: 600; cursor: pointer; }
+.auth-tab.active { color: var(--text); background: rgba(255,255,255,.1); box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+.auth-panel[hidden], .auth-tabs[hidden] { display: none; }
+.auth-input { width: 100%; margin-bottom: .85rem; }
+.auth-submit { min-height: 44px; margin-top: .15rem; }
+.auth-link, .auth-back { display: block; margin: .85rem auto 0; padding: .25rem; border: 0; background: none;
+    color: var(--accent); font: inherit; cursor: pointer; }
+.auth-back { margin: 0 0 1rem; }
+.auth-note { padding: .8rem; margin-bottom: 1rem; border: 1px solid rgba(79,172,254,.18);
+    border-radius: 10px; background: rgba(79,172,254,.07); font-size: .84rem; }
+.account-panel { text-align: center; }
+.account-panel strong { color: var(--text); word-break: break-word; }
+
 @media (max-width: 1050px) {
     .account-summary small { display: none; }
     .header-actions .btn-ghost { display: none; }
+}
+
+@media (max-width: 760px) {
+    body { overflow: auto; }
+    .app-shell { min-height: 100dvh; height: auto; overflow: visible; }
+    .app-header { height: auto; min-height: 60px; padding: .65rem .8rem 0; gap: .65rem; flex-wrap: wrap; }
+    .brand { flex: 1; }
+    .brand h1 { font-size: 1.1rem; }
+    .header-actions { margin-left: 0; gap: .4rem; }
+    .account-summary { max-width: 120px; }
+    .account-summary span { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .header-actions .btn-primary { padding: .55rem .7rem; }
+    .tab-bar { order: 3; width: calc(100% + 1.6rem); margin: 0 -.8rem; overflow-x: auto;
+        scrollbar-width: none; border-top: 1px solid var(--border); }
+    .tab-bar::-webkit-scrollbar { display: none; }
+    .tab { flex: 0 0 auto; height: 50px; padding: 0 .85rem; font-size: .82rem; }
+    .panel-inner { padding: 1rem; }
+    .tab-panel { min-height: calc(100dvh - 112px); overflow: visible; }
+    .modal { padding: 1.35rem; width: calc(100vw - 1rem); max-height: calc(100dvh - 1rem); }
+    .modal-close { right: .65rem; top: .4rem; }
+    .auth-heading { padding: 0 1.25rem; }
+    .auth-modal { border-radius: 16px; }
+    .modal-row { flex-direction: column; }
 }
 
 .auto-align-box {

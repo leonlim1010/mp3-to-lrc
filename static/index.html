@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SoniScript — MP3 to LRC</title>
     <meta name="description" content="Transcribe MP3 files to LRC and correct lyrics with precise timestamps.">
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/style.css?v=20260810-2">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
 </head>
 
@@ -462,19 +462,62 @@
         </section>
     </div>
 
-    <dialog class="modal" id="account-modal">
+    <dialog class="modal auth-modal" id="account-modal">
         <button class="modal-close" onclick="closeAccountModal()" aria-label="Close">&times;</button>
-        <h2>Save your private LRC library</h2>
-        <p>Guests can transcribe immediately. Sign in to keep files permanently and access them on other devices.</p>
-        <button class="btn btn-google" onclick="signInGoogle()">Keep guest files with Google</button>
-        <button class="btn btn-ghost modal-full-btn" onclick="signInExistingGoogle()">Sign into an existing Google account</button>
-        <div class="modal-divider"><span>or use email OTP</span></div>
-        <label class="modal-label">Email address</label>
-        <div class="modal-row"><input id="auth-email" type="email" class="tag-input" placeholder="you@example.com"><button class="btn btn-primary" onclick="sendEmailOtp()">Keep files</button></div>
-        <button class="btn btn-ghost modal-full-btn" onclick="sendExistingEmailOtp()">Email OTP for an existing account</button>
-        <div class="modal-row" id="otp-row" hidden><input id="auth-otp" class="tag-input" inputmode="numeric" placeholder="6-digit code"><button class="btn btn-success" onclick="verifyEmailOtp()">Verify</button></div>
+        <div class="auth-heading">
+            <span class="auth-logo" aria-hidden="true">♫</span>
+            <h2 id="auth-title">Welcome back</h2>
+            <p id="auth-description">Sign in to access your private LRC library.</p>
+        </div>
+        <div class="auth-tabs" id="auth-tabs">
+            <button type="button" class="auth-tab active" data-auth-view="signin" onclick="setAuthView('signin')">Sign in</button>
+            <button type="button" class="auth-tab" data-auth-view="signup" onclick="setAuthView('signup')">Create account</button>
+        </div>
+
+        <section class="auth-panel" data-auth-panel="signin">
+            <button class="btn btn-google" onclick="signInExistingGoogle()">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.9h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.4z"/><path fill="#34A853" d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 1-3.4 1a5.8 5.8 0 0 1-5.5-4H3.2v2.6A10 10 0 0 0 12 22z"/><path fill="#FBBC05" d="M6.5 14.1a6 6 0 0 1 0-4.2V7.3H3.2a10 10 0 0 0 0 9.4l3.3-2.6z"/><path fill="#EA4335" d="M12 5.9c1.5 0 2.8.5 3.8 1.5l2.9-2.8A9.7 9.7 0 0 0 3.2 7.3l3.3 2.6A5.8 5.8 0 0 1 12 5.9z"/></svg>
+                Continue with Google
+            </button>
+            <div class="modal-divider"><span>or sign in with email</span></div>
+            <label class="modal-label" for="signin-email">Email address</label>
+            <input id="signin-email" type="email" class="tag-input auth-input" placeholder="you@example.com" autocomplete="email">
+            <label class="modal-label" for="signin-password">Password</label>
+            <input id="signin-password" type="password" class="tag-input auth-input" placeholder="Your password" autocomplete="current-password" onkeydown="if(event.key==='Enter') signInEmailPassword()">
+            <button class="btn btn-primary modal-full-btn auth-submit" onclick="signInEmailPassword()">Sign in</button>
+            <button class="auth-link" type="button" onclick="setAuthView('forgot')">Forgot password?</button>
+        </section>
+
+        <section class="auth-panel" data-auth-panel="signup" hidden>
+            <button class="btn btn-google" onclick="signInGoogle()">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.9h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.4z"/><path fill="#34A853" d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 1-3.4 1a5.8 5.8 0 0 1-5.5-4H3.2v2.6A10 10 0 0 0 12 22z"/><path fill="#FBBC05" d="M6.5 14.1a6 6 0 0 1 0-4.2V7.3H3.2a10 10 0 0 0 0 9.4l3.3-2.6z"/><path fill="#EA4335" d="M12 5.9c1.5 0 2.8.5 3.8 1.5l2.9-2.8A9.7 9.7 0 0 0 3.2 7.3l3.3 2.6A5.8 5.8 0 0 1 12 5.9z"/></svg>
+                Keep files with Google
+            </button>
+            <div class="modal-divider"><span>or use email</span></div>
+            <p class="auth-note">We will email a confirmation link. Open it on any device, then create your password. Your guest files stay with this account.</p>
+            <label class="modal-label" for="signup-email">Email address</label>
+            <input id="signup-email" type="email" class="tag-input auth-input" placeholder="you@example.com" autocomplete="email">
+            <button class="btn btn-primary modal-full-btn auth-submit" onclick="startEmailAccount()">Send confirmation email</button>
+        </section>
+
+        <section class="auth-panel" data-auth-panel="forgot" hidden>
+            <button class="auth-back" type="button" onclick="setAuthView('signin')">← Back to sign in</button>
+            <label class="modal-label" for="reset-email">Email address</label>
+            <input id="reset-email" type="email" class="tag-input auth-input" placeholder="you@example.com" autocomplete="email">
+            <button class="btn btn-primary modal-full-btn auth-submit" onclick="requestPasswordReset()">Send password reset email</button>
+        </section>
+
+        <section class="auth-panel" data-auth-panel="password" hidden>
+            <label class="modal-label" for="new-password">New password</label>
+            <input id="new-password" type="password" class="tag-input auth-input" placeholder="At least 8 characters" autocomplete="new-password" onkeydown="if(event.key==='Enter') saveAccountPassword()">
+            <button class="btn btn-primary modal-full-btn auth-submit" onclick="saveAccountPassword()">Save password</button>
+        </section>
+
+        <section class="auth-panel account-panel" data-auth-panel="account" hidden>
+            <p>You are signed in as <strong id="account-email"></strong>.</p>
+            <button class="btn btn-ghost modal-full-btn" id="account-signout" onclick="signOutAccount()">Sign out to guest mode</button>
+        </section>
         <p class="auth-message" id="auth-message"></p>
-        <button class="btn btn-ghost" id="account-signout" onclick="signOutAccount()">Sign out to guest mode</button>
     </dialog>
 
     <dialog class="modal guide-modal" id="guide-modal">
@@ -489,7 +532,7 @@
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.2"></script>
-    <script src="/static/auth.js?v=20260810-5"></script>
+    <script src="/static/auth.js?v=20260810-6"></script>
     <script src="/static/script.js"></script>
 </body>
 

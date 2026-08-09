@@ -13,6 +13,11 @@
             hash.has('access_token') || hash.has('refresh_token') || hash.has('error') ||
             hash.has('error_description');
     })();
+    const authCallbackType = (() => {
+        const query = new URLSearchParams(window.location.search);
+        const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        return query.get('type') || hash.get('type') || '';
+    })();
 
     function callbackError() {
         const query = new URLSearchParams(window.location.search);
@@ -73,7 +78,7 @@
         });
 
         if (authCallback) {
-            document.getElementById('account-status').textContent = 'Completing Google sign-in...';
+            document.getElementById('account-status').textContent = 'Completing sign-in...';
             const oauthError = callbackError();
             if (oauthError) {
                 clearAuthCallbackUrl();
@@ -82,6 +87,12 @@
             session = await withTimeout(callbackSession, 30000, 'Google sign-in completion');
             clearAuthCallbackUrl();
             updateAccountUi(session.user, true);
+            if (authCallbackType === 'recovery' || authCallbackType === 'email_change' ||
+                localStorage.getItem('soniscript-email-upgrade') === 'pending') {
+                localStorage.removeItem('soniscript-email-upgrade');
+                setAuthView('password');
+                document.getElementById('account-modal').showModal();
+            }
             return;
         }
 
@@ -149,7 +160,37 @@
         }
     }
 
-    window.openAccountModal = () => document.getElementById('account-modal').showModal();
+    const authCopy = {
+        signin: ['Welcome back', 'Sign in to access your private LRC library.'],
+        signup: ['Create your account', 'Keep your current guest files and access them on every device.'],
+        forgot: ['Reset your password', 'We will send a secure password-reset link to your email.'],
+        password: ['Choose a password', 'Finish securing your account with a password of at least 8 characters.'],
+        account: ['Your account', 'Your LRC files are private and saved permanently.']
+    };
+
+    window.setAuthView = view => {
+        document.querySelectorAll('[data-auth-panel]').forEach(panel => {
+            panel.hidden = panel.dataset.authPanel !== view;
+        });
+        document.querySelectorAll('[data-auth-view]').forEach(tab => {
+            tab.classList.toggle('active', tab.dataset.authView === view);
+        });
+        const copy = authCopy[view] || authCopy.signin;
+        document.getElementById('auth-title').textContent = copy[0];
+        document.getElementById('auth-description').textContent = copy[1];
+        document.getElementById('auth-tabs').hidden = !['signin', 'signup'].includes(view);
+        showAuthMessage('');
+    };
+    window.openAccountModal = () => {
+        const registered = session && !session.user.is_anonymous;
+        if (registered) {
+            document.getElementById('account-email').textContent = session.user.email || 'your account';
+            setAuthView('account');
+        } else {
+            setAuthView('signin');
+        }
+        document.getElementById('account-modal').showModal();
+    };
     window.closeAccountModal = () => document.getElementById('account-modal').close();
     window.signInGoogle = async () => {
         await ready;
@@ -184,45 +225,70 @@
             window.location.assign(result.data.url);
         } catch (error) { showAuthMessage(error.message, true); }
     };
-    window.sendEmailOtp = async () => {
+    window.signInEmailPassword = async () => {
         await ready;
         if (!client || initError) return showAuthMessage(initError?.message || 'Accounts are unavailable.', true);
-        const email = document.getElementById('auth-email').value.trim();
+        const email = document.getElementById('signin-email').value.trim();
+        const password = document.getElementById('signin-password').value;
         if (!email) return showAuthMessage('Enter your email address.', true);
-        showAuthMessage('Sending verification code...');
-        let result;
+        if (!password) return showAuthMessage('Enter your password.', true);
+        showAuthMessage('Signing in...');
         try {
-            result = session && session.user.is_anonymous
-                ? await withTimeout(client.auth.updateUser({ email }), 30000, 'Email verification')
-                : await withTimeout(client.auth.signInWithOtp({ email }), 30000, 'Email verification');
+            const result = await withTimeout(
+                client.auth.signInWithPassword({ email, password }), 30000, 'Email sign-in'
+            );
+            if (result.error) throw result.error;
+            session = result.data.session;
+            updateAccountUi(session.user, true);
+            closeAccountModal();
         } catch (error) { return showAuthMessage(error.message, true); }
-        if (result.error) return showAuthMessage(result.error.message, true);
-        document.getElementById('otp-row').hidden = false;
-        showAuthMessage('Check your email for the verification code.');
     };
-    window.verifyEmailOtp = async () => {
-        const email = document.getElementById('auth-email').value.trim();
-        const token = document.getElementById('auth-otp').value.trim();
-        const type = session && session.user.is_anonymous ? 'email_change' : 'email';
-        showAuthMessage('Verifying code...');
-        const result = await withTimeout(client.auth.verifyOtp({ email, token, type }), 30000, 'Code verification');
-        if (result.error) return showAuthMessage(result.error.message, true);
-        closeAccountModal();
-        location.reload();
-    };
-    window.sendExistingEmailOtp = async () => {
+
+    window.startEmailAccount = async () => {
         await ready;
         if (!client || initError) return showAuthMessage(initError?.message || 'Accounts are unavailable.', true);
-        const email = document.getElementById('auth-email').value.trim();
+        const email = document.getElementById('signup-email').value.trim();
         if (!email) return showAuthMessage('Enter your email address.', true);
-        showAuthMessage('Sending sign-in code...');
-        const result = await withTimeout(
-            client.auth.signInWithOtp({ email, options: { shouldCreateUser: false } }),
-            30000, 'Email sign-in'
-        );
-        if (result.error) return showAuthMessage(result.error.message, true);
-        document.getElementById('otp-row').hidden = false;
-        showAuthMessage('Check your email for the sign-in code.');
+        if (!session?.user?.is_anonymous) return showAuthMessage('This browser is already signed in.', true);
+        showAuthMessage('Sending confirmation email...');
+        try {
+            const result = await withTimeout(
+                client.auth.updateUser({ email }, { emailRedirectTo: window.location.origin }),
+                30000, 'Email confirmation'
+            );
+            if (result.error) throw result.error;
+            localStorage.setItem('soniscript-email-upgrade', 'pending');
+            showAuthMessage('Email sent. Open the confirmation link to verify your address and choose a password.');
+        } catch (error) { showAuthMessage(error.message, true); }
+    };
+
+    window.requestPasswordReset = async () => {
+        await ready;
+        const email = document.getElementById('reset-email').value.trim();
+        if (!email) return showAuthMessage('Enter your email address.', true);
+        showAuthMessage('Sending password reset email...');
+        try {
+            const result = await withTimeout(client.auth.resetPasswordForEmail(email, {
+                redirectTo: window.location.origin
+            }), 30000, 'Password reset');
+            if (result.error) throw result.error;
+            showAuthMessage('Reset email sent. Open its link to choose a new password.');
+        } catch (error) { showAuthMessage(error.message, true); }
+    };
+
+    window.saveAccountPassword = async () => {
+        await ready;
+        const password = document.getElementById('new-password').value;
+        if (password.length < 8) return showAuthMessage('Use at least 8 characters.', true);
+        showAuthMessage('Saving password...');
+        try {
+            const result = await withTimeout(client.auth.updateUser({ password }), 30000, 'Password update');
+            if (result.error) throw result.error;
+            session = (await client.auth.getSession()).data.session;
+            updateAccountUi(session.user, true);
+            showAuthMessage('Password saved. Your account is ready.');
+            setTimeout(closeAccountModal, 700);
+        } catch (error) { showAuthMessage(error.message, true); }
     };
     window.signOutAccount = async () => {
         await ready;
