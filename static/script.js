@@ -130,14 +130,14 @@ async function loadLrcList() {
     try {
         const res = await fetch('/list_lrc');
         const data = await res.json();
-        renderLrcList(data.files || []);
+        renderLrcList(data.records || data.files || []);
     } catch (e) {
         lrcListEl.innerHTML = '<p class="empty-state" style="color:var(--red)">Failed to load files.</p>';
     }
 }
 
 // All loaded file names (for search/filter)
-/** @type {string[]} */
+/** @type {(string|{id:string,filename:string})[]} */
 let allLrcFiles = [];
 
 const fileCountBadge = document.getElementById('file-count-badge');
@@ -157,18 +157,21 @@ function renderLrcList(files) {
     fileCountBadge.textContent = `${files.length} file${files.length !== 1 ? 's' : ''}`;
     fileCountBadge.style.display = '';
 
-    files.forEach((name, idx) => {
-        lrcListEl.appendChild(makeLrcBtn(name, idx + 1));
+    files.forEach((file, idx) => {
+        lrcListEl.appendChild(makeLrcBtn(file, idx + 1));
     });
 }
 
-function makeLrcBtn(name, num) {
+function makeLrcBtn(file, num) {
+    const name = typeof file === 'string' ? file : file.filename;
+    const id = typeof file === 'string' ? file : file.id;
     const btn = document.createElement('button');
     btn.className = 'lrc-file-btn';
     btn.dataset.filename = name;
+    btn.dataset.recordId = id;
     btn.title = name;
     btn.innerHTML = `<span class="lrc-file-num">${num}</span><span class="lrc-file-name">${escHtml(name)}</span>`;
-    btn.onclick = () => openLrc(name, btn);
+    btn.onclick = () => openLrc(id, btn, name);
     return btn;
 }
 
@@ -221,7 +224,7 @@ const generateReviewBtn = document.getElementById('generate-review-btn');
 /** @type {{timestamp_str:string, text:string}[]} */
 let currentLines = [];
 
-async function openLrc(filename, btnEl) {
+async function openLrc(filename, btnEl, displayName = filename) {
     // Highlight selected
     document.querySelectorAll('.lrc-file-btn').forEach(b => b.classList.remove('selected'));
     btnEl.classList.add('selected');
@@ -229,7 +232,7 @@ async function openLrc(filename, btnEl) {
 
     editorEmpty.style.display = 'none';
     editorContent.style.display = 'flex';
-    editorFilename.textContent = filename;
+    editorFilename.textContent = displayName;
     timestampsPanel.innerHTML = '<span style="color:var(--text-muted);font-size:0.85rem">Loading</span>';
     lyricsEditor.value = '';
     saveBtn.disabled = true;
@@ -385,6 +388,30 @@ async function saveModified() {
     }
 }
 
+async function downloadSelectedLrc() {
+    if (!selectedLrcFile) return;
+    const res = await fetch(`/api/lrc/${encodeURIComponent(selectedLrcFile)}/download`);
+    if (!res.ok) return alert('Download failed.');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = editorFilename.textContent || 'lyrics.lrc';
+    link.click();
+    URL.revokeObjectURL(url);
+}
+
+async function deleteSelectedLrc() {
+    if (!selectedLrcFile || !confirm(`Delete ${editorFilename.textContent}?`)) return;
+    const res = await fetch(`/api/lrc/${encodeURIComponent(selectedLrcFile)}`, { method: 'DELETE' });
+    if (!res.ok) return alert('Delete failed.');
+    selectedLrcFile = null;
+    currentLines = [];
+    editorContent.style.display = 'none';
+    editorEmpty.style.display = 'flex';
+    await loadLrcList();
+}
+
 // ---------------------------------------------------------------------------
 // Utility
 // ---------------------------------------------------------------------------
@@ -475,13 +502,14 @@ async function loadTesterLrcList() {
     try {
         const res = await fetch('/list_modified_lrc');
         const data = await res.json();
-        const files = data.files || [];
+        const files = data.records || data.files || [];
 
         // Clear existing options (keep placeholder)
         testerLrcSelect.innerHTML = '<option value="">...select a file </option>';
-        files.forEach(name => {
+        files.forEach(file => {
+            const name = typeof file === 'string' ? file : file.filename;
             const opt = document.createElement('option');
-            opt.value = name;
+            opt.value = typeof file === 'string' ? file : file.id;
             opt.textContent = name;
             testerLrcSelect.appendChild(opt);
         });

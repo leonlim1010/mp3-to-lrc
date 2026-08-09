@@ -41,6 +41,11 @@
                     <span class="tab-icon">🏷️</span> Tag Manager
                 </button>
             </nav>
+            <div class="header-actions">
+                <button class="btn btn-ghost" onclick="document.getElementById('guide-modal').showModal()">Help &amp; Rules</button>
+                <div class="account-summary"><span id="account-status">Connecting...</span><small id="account-policy"></small></div>
+                <button class="btn btn-primary" id="account-button" onclick="openAccountModal()">Account</button>
+            </div>
         </header>
 
         <!-- ================================================================
@@ -80,7 +85,7 @@
                         </div>
                     </div>
                     <div class="file-queue" id="file-queue"></div>
-                    <p class="queue-hint">LRC files will be saved to <code>C:\Users\User\Music</code></p>
+                    <p class="queue-hint">Cloud LRC files are saved privately to your account. Download important files as a backup.</p>
                 </div>
             </div>
         </section>
@@ -122,6 +127,8 @@
                     <div class="editor-content" id="editor-content" style="display:none;">
                         <div class="editor-top-bar">
                             <span class="editor-filename" id="editor-filename"></span>
+                            <button class="btn btn-ghost" id="download-btn" onclick="downloadSelectedLrc()">Download</button>
+                            <button class="btn btn-ghost" id="delete-btn" onclick="deleteSelectedLrc()">Delete</button>
                             <button class="btn btn-primary" id="auto-align-btn" onclick="toggleAutoAlign()">Auto-align Full Lyrics</button>
                             <button class="btn btn-success" id="save-btn" onclick="saveModified()">
                                 💾 Save as Modified
@@ -455,6 +462,34 @@
         </section>
     </div>
 
+    <dialog class="modal" id="account-modal">
+        <button class="modal-close" onclick="closeAccountModal()" aria-label="Close">&times;</button>
+        <h2>Save your private LRC library</h2>
+        <p>Guests can transcribe immediately. Sign in to keep files permanently and access them on other devices.</p>
+        <button class="btn btn-google" onclick="signInGoogle()">Keep guest files with Google</button>
+        <button class="btn btn-ghost modal-full-btn" onclick="signInExistingGoogle()">Sign into an existing Google account</button>
+        <div class="modal-divider"><span>or use email OTP</span></div>
+        <label class="modal-label">Email address</label>
+        <div class="modal-row"><input id="auth-email" type="email" class="tag-input" placeholder="you@example.com"><button class="btn btn-primary" onclick="sendEmailOtp()">Keep files</button></div>
+        <button class="btn btn-ghost modal-full-btn" onclick="sendExistingEmailOtp()">Email OTP for an existing account</button>
+        <div class="modal-row" id="otp-row" hidden><input id="auth-otp" class="tag-input" inputmode="numeric" placeholder="6-digit code"><button class="btn btn-success" onclick="verifyEmailOtp()">Verify</button></div>
+        <p class="auth-message" id="auth-message"></p>
+        <button class="btn btn-ghost" onclick="signOutAccount()">Reset this session / Sign out</button>
+    </dialog>
+
+    <dialog class="modal guide-modal" id="guide-modal">
+        <button class="modal-close" onclick="this.closest('dialog').close()" aria-label="Close">&times;</button>
+        <h2>How to use SoniScript</h2>
+        <ol><li>Upload an MP3 and select <strong>Transcribe All</strong>.</li><li>Open your private LRC in the Editor to correct lyrics.</li><li>Use Sync Tester to adjust timing, then download a backup.</li></ol>
+        <h3>Account and storage rules</h3>
+        <ul><li>Guest files are private but expire after 7 days. Clearing browser data can remove access.</li><li>Signed-in files are private and retained until you delete them.</li><li>MP3 uploads are temporary and deleted after processing; only LRC text is stored.</li></ul>
+        <h3>Usage rules</h3>
+        <ul><li>Guests: 3 transcriptions/day, maximum 10 minutes each.</li><li>Signed-in users: 10 transcriptions/day, maximum 15 minutes each.</li><li>Maximum upload size is 25 MB. Shared Groq capacity can temporarily become unavailable.</li><li>Only upload audio you are permitted to process. Automated or abusive use is prohibited.</li></ul>
+        <p>AI transcription can contain mistakes, especially with noise, music, accents, or overlapping voices. Always review the result.</p>
+    </dialog>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/static/auth.js"></script>
     <script src="/static/script.js"></script>
 </body>
 

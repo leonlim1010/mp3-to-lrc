@@ -13,12 +13,15 @@ import urllib.parse
 import urllib.request
 import difflib
 import unicodedata
+import math
+import hashlib
 from pathlib import Path
 from typing import List, Optional
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Request, Body
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse, Response
+import cloud_store
 
 # mutagen – ID3 tag read/write
 try:
@@ -303,7 +306,24 @@ def _map_token_boundaries(original_keys: list, reference_keys: list) -> list:
 @app.head("/health")
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "mode": "cloud" if IS_CLOUD else "local"}
+    return {"status": "ok", "mode": "cloud" if IS_CLOUD else "local",
+            "accounts": cloud_store.ENABLED}
+
+
+@app.get("/api/config")
+async def public_config():
+    """Browser-safe configuration; never expose server-side secrets here."""
+    return {
+        "cloud": IS_CLOUD,
+        "accounts_enabled": cloud_store.ENABLED,
+        "supabase_url": cloud_store.SUPABASE_URL if cloud_store.ENABLED else "",
+        "supabase_key": cloud_store.SUPABASE_KEY if cloud_store.ENABLED else "",
+        "limits": {
+            "guest": {"daily": 3, "max_minutes": 10, "retention_days": 7},
+            "registered": {"daily": 10, "max_minutes": 15, "retention_days": None},
+            "max_file_mb": 25,
+        },
+    }
 
 
 @app.head("/")
@@ -316,7 +336,7 @@ async def read_index():
 
 
 @app.post("/transcribe")
-async def transcribe(audio_file: UploadFile = File(...)):
+async def transcribe(request: Request, audio_file: UploadFile = File(...)):
     """
     Transcribe a single MP3 file with Whisper.
     Saves the resulting LRC to MUSIC_DIR/<stem>.lrc
@@ -325,6 +345,7 @@ async def transcribe(audio_file: UploadFile = File(...)):
     if not audio_file.filename.lower().endswith(".mp3"):
         raise HTTPException(status_code=400, detail="Only MP3 files are supported.")
 
+    who = cloud_store.identity(request) if IS_CLOUD and cloud_store.ENABLED else None
     stem = Path(audio_file.filename).stem
     lrc_filename = f"{stem}.lrc"
     lrc_path = MUSIC_DIR / lrc_filename
@@ -336,22 +357,47 @@ async def transcribe(audio_file: UploadFile = File(...)):
             shutil.copyfileobj(audio_file.file, tmp)
             tmp_path = tmp.name
 
+        if IS_CLOUD and os.path.getsize(tmp_path) > 25 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="MP3 exceeds the 25 MB upload limit.")
+
+        usage = None
+        if who:
+            probe = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                 "-of", "default=noprint_wrappers=1:nokey=1", tmp_path],
+                capture_output=True, text=True, timeout=20,
+            )
+            if probe.returncode != 0:
+                raise HTTPException(status_code=400, detail="Could not read the MP3 duration.")
+            duration = max(1, math.ceil(float(probe.stdout.strip())))
+            client_ip = request.client.host if request.client else "unknown"
+            salt = os.environ.get("RATE_LIMIT_SALT", cloud_store.SUPABASE_URL)
+            request_key = hashlib.sha256(f"{salt}:{client_ip}".encode()).hexdigest()
+            usage = cloud_store.reserve_transcription(who, duration, request_key)
+
         print(f"Transcribing: {audio_file.filename}")
         segments = transcribe_audio(tmp_path)
         print(f"Got {len(segments)} segments.")
 
         lrc_content = segments_to_lrc(segments)
 
-        # Save to Music folder
-        lrc_path.write_text(lrc_content, encoding="utf-8")
-        print(f"Saved: {lrc_path}")
+        record = None
+        if who:
+            record = cloud_store.save_lrc(who, lrc_filename, lrc_content)
+            print(f"Saved private LRC record: {record['id']}")
+        else:
+            lrc_path.write_text(lrc_content, encoding="utf-8")
+            print(f"Saved: {lrc_path}")
 
         return JSONResponse(content={
             "filename": lrc_filename,
-            "lrc_path": str(lrc_path),
-            "lines_count": len(segments)
+            "id": record.get("id") if record else None,
+            "lines_count": len(segments),
+            "usage": usage,
         })
 
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         print(traceback.format_exc())
@@ -363,11 +409,15 @@ async def transcribe(audio_file: UploadFile = File(...)):
 
 
 @app.get("/list_lrc")
-async def list_lrc():
+async def list_lrc(request: Request):
     """
     Return filenames of all .lrc files in the Music folder
     that do NOT have '_modified' in their name.
     """
+    if IS_CLOUD and cloud_store.ENABLED:
+        who = cloud_store.identity(request)
+        records = cloud_store.list_lrc(who, "original")
+        return JSONResponse(content={"records": records, "files": [r["filename"] for r in records]})
     files = [
         f.name for f in MUSIC_DIR.glob("*.lrc")
         if "_modified" not in f.name
@@ -377,11 +427,16 @@ async def list_lrc():
 
 
 @app.get("/get_lrc/{filename}")
-async def get_lrc(filename: str):
+async def get_lrc(filename: str, request: Request):
     """
     Return parsed lines ({timestamp_str, text}) for a given LRC filename.
     Only allows files without '_modified' in the name.
     """
+    if IS_CLOUD and cloud_store.ENABLED:
+        who = cloud_store.identity(request)
+        record = cloud_store.get_lrc(who, filename)
+        return JSONResponse(content={"id": record["id"], "filename": record["filename"],
+                                     "lines": parse_lrc(record["lrc_content"])})
     if "_modified" in filename:
         raise HTTPException(status_code=400, detail="Cannot load a _modified file.")
     lrc_path = MUSIC_DIR / filename
@@ -392,8 +447,27 @@ async def get_lrc(filename: str):
     return JSONResponse(content={"filename": filename, "lines": lines})
 
 
+@app.get("/api/lrc/{record_id}/download")
+async def download_private_lrc(record_id: str, request: Request):
+    who = cloud_store.identity(request)
+    record = cloud_store.get_lrc(who, record_id)
+    safe_name = Path(record["filename"]).name.replace('"', "")
+    return Response(
+        record["lrc_content"], media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}"'},
+    )
+
+
+@app.delete("/api/lrc/{record_id}")
+async def delete_private_lrc(record_id: str, request: Request):
+    who = cloud_store.identity(request)
+    cloud_store.delete_lrc(who, record_id)
+    return Response(status_code=204)
+
+
 @app.post("/save_modified")
 async def save_modified(
+    request: Request,
     filename: str = Form(...),
     corrected_lyrics: str = Form(...)
 ):
@@ -401,6 +475,23 @@ async def save_modified(
     Merge correct lyrics (one line per \n) with timestamps from the original
     LRC file, save as <stem>_modified.lrc, then delete the original.
     """
+    if IS_CLOUD and cloud_store.ENABLED:
+        who = cloud_store.identity(request)
+        record = cloud_store.get_lrc(who, filename)
+        original_lines = parse_lrc(record["lrc_content"])
+        correct_lines = [line.strip() for line in corrected_lyrics.split("\n")]
+        if len(correct_lines) != len(original_lines):
+            raise HTTPException(status_code=400, detail="Line count mismatch.")
+        modified_content = "\n".join(
+            f"{original['timestamp_str']} {text}"
+            for original, text in zip(original_lines, correct_lines)
+        )
+        modified_name = f"{Path(record['filename']).stem}_modified.lrc"
+        updated = cloud_store.update_lrc(
+            who, record["id"], {"filename": modified_name,
+                                "lrc_content": modified_content, "status": "modified"},
+        )
+        return JSONResponse(content={"saved_as": updated["filename"], "id": updated["id"]})
     lrc_path = MUSIC_DIR / filename
     if not lrc_path.exists():
         raise HTTPException(status_code=404, detail="Original file not found.")
@@ -442,19 +533,28 @@ async def save_modified(
 
 
 @app.post("/align_lyrics")
-async def align_lyrics(filename: str = Form(...), reference_lyrics: str = Form(...)):
+async def align_lyrics(request: Request, filename: str = Form(...), reference_lyrics: str = Form(...)):
     """Return a reviewable alignment proposal without writing or changing timestamps."""
+    private_record = IS_CLOUD and cloud_store.ENABLED
+    if private_record:
+        who = cloud_store.identity(request)
+        record = cloud_store.get_lrc(who, filename)
+        original_content = record["lrc_content"]
+    else:
+        original_content = None
     safe_name = Path(filename).name
-    if not safe_name.lower().endswith(".lrc") or "_modified" in safe_name:
+    if not private_record and (not safe_name.lower().endswith(".lrc") or "_modified" in safe_name):
         raise HTTPException(status_code=400, detail="Select an original .lrc file.")
     lrc_path = MUSIC_DIR / safe_name
-    if not lrc_path.exists():
-        raise HTTPException(status_code=404, detail="LRC file not found.")
+    if not private_record:
+        if not lrc_path.exists():
+            raise HTTPException(status_code=404, detail="LRC file not found.")
+        original_content = lrc_path.read_text(encoding="utf-8")
     reference_lyrics = reference_lyrics.strip()
     if not reference_lyrics:
         raise HTTPException(status_code=400, detail="Paste the completed lyrics first.")
 
-    original_lines = parse_lrc(lrc_path.read_text(encoding="utf-8"))
+    original_lines = parse_lrc(original_content)
     original_tokens = _alignment_tokens("\n".join(line["text"] for line in original_lines))
     reference_tokens = _alignment_tokens(reference_lyrics)
     if not original_lines or not original_tokens or not reference_tokens:
@@ -508,10 +608,14 @@ async def align_lyrics(filename: str = Form(...), reference_lyrics: str = Form(.
 # ---------------------------------------------------------------------------
 
 @app.get("/list_modified_lrc")
-async def list_modified_lrc():
+async def list_modified_lrc(request: Request):
     """
     Return sorted filenames of all *_modified.lrc files in the Music folder.
     """
+    if IS_CLOUD and cloud_store.ENABLED:
+        who = cloud_store.identity(request)
+        records = cloud_store.list_lrc(who, "modified")
+        return JSONResponse(content={"records": records, "files": [r["filename"] for r in records]})
     files = [
         f.name for f in MUSIC_DIR.glob("*.lrc")
         if "_modified" in f.name
@@ -532,11 +636,18 @@ async def list_mp3():
 
 
 @app.get("/get_modified_lrc/{filename}")
-async def get_modified_lrc(filename: str):
+async def get_modified_lrc(filename: str, request: Request):
     """
     Return parsed lines for a *_modified.lrc file.
     Each line: {timestamp_str, seconds, text}
     """
+    if IS_CLOUD and cloud_store.ENABLED:
+        who = cloud_store.identity(request)
+        record = cloud_store.get_lrc(who, filename)
+        parsed = parse_lrc(record["lrc_content"])
+        for line in parsed:
+            line["seconds"] = lrc_timestamp_to_seconds(line["timestamp_str"])
+        return JSONResponse(content={"id": record["id"], "filename": record["filename"], "lines": parsed})
     if "_modified" not in filename:
         raise HTTPException(status_code=400, detail="Only _modified files allowed.")
     lrc_path = MUSIC_DIR / filename
@@ -714,6 +825,7 @@ async def stream_local_audio(filename: str, request: Request):
 
 @app.post("/save_lrc")
 async def save_lrc(
+    request: Request,
     filename: str = Form(...),
     lrc_content: str = Form(...),
 ):
@@ -723,6 +835,29 @@ async def save_lrc(
     uploaded LRC files (any .lrc filename).
     Returns {saved_as, lines_count}.
     """
+    if IS_CLOUD and cloud_store.ENABLED:
+        who = cloud_store.identity(request)
+        try:
+            record = cloud_store.get_lrc(who, filename)
+        except HTTPException as exc:
+            if exc.status_code not in (400, 404):
+                raise
+            record = None
+        if record:
+            safe_name = record["filename"].replace("_modified.lrc", ".lrc")
+            updated = cloud_store.update_lrc(
+                who, record["id"], {"filename": safe_name,
+                                    "lrc_content": lrc_content, "status": "original"},
+            )
+        else:
+            safe_name = Path(filename).name
+            if not safe_name.lower().endswith(".lrc"):
+                raise HTTPException(status_code=400, detail="Only .lrc files are allowed.")
+            updated = cloud_store.save_lrc(who, safe_name, lrc_content, "original")
+        lines_count = len([line for line in lrc_content.splitlines()
+                           if line.strip().startswith("[")])
+        return JSONResponse(content={"saved_as": updated["filename"],
+                                     "id": updated["id"], "lines_count": lines_count})
     # Safety: only allow .lrc extension, no path traversal
     if not filename.lower().endswith(".lrc"):
         raise HTTPException(status_code=400, detail="Only .lrc files are allowed.")
