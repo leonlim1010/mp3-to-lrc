@@ -3,21 +3,54 @@
     let client = null;
     let session = null;
     let config = null;
+    let initError = null;
+
+    function withTimeout(promise, milliseconds, label) {
+        let timer;
+        const timeout = new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error(`${label} timed out. Please retry.`)), milliseconds);
+        });
+        return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+    }
+
+    // Serialize auth work inside this page without relying on navigator.locks,
+    // which can remain stuck in some browsers after an interrupted refresh.
+    let authQueue = Promise.resolve();
+    function browserSafeLock(_name, _acquireTimeout, operation) {
+        const result = authQueue.then(operation, operation);
+        authQueue = result.catch(() => undefined);
+        return result;
+    }
 
     const ready = (async () => {
-        config = await nativeFetch('/api/config').then(response => response.json());
+        config = await withTimeout(
+            nativeFetch('/api/config', { cache: 'no-store' }).then(response => {
+                if (!response.ok) throw new Error(`Configuration failed (${response.status}).`);
+                return response.json();
+            }), 10000, 'Configuration request'
+        );
         window.appConfig = config;
         if (!config.accounts_enabled) {
             updateAccountUi(null, false);
             return;
         }
         client = window.supabase.createClient(config.supabase_url, config.supabase_key, {
-            auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+            auth: {
+                persistSession: true,
+                autoRefreshToken: true,
+                detectSessionInUrl: true,
+                storageKey: 'soniscript-auth-v2',
+                lock: browserSafeLock
+            }
         });
-        const current = await client.auth.getSession();
+        document.getElementById('account-status').textContent = 'Starting guest session...';
+        const current = await withTimeout(client.auth.getSession(), 10000, 'Session check');
+        if (current.error) throw current.error;
         session = current.data.session;
         if (!session) {
-            const anonymous = await client.auth.signInAnonymously();
+            const anonymous = await withTimeout(
+                client.auth.signInAnonymously(), 15000, 'Guest sign-in'
+            );
             if (anonymous.error) throw anonymous.error;
             session = anonymous.data.session;
         }
@@ -27,6 +60,7 @@
             updateAccountUi(session && session.user, true);
         });
     })().catch(error => {
+        initError = error;
         console.error('Account initialization failed:', error);
         updateAccountUi(null, false, error.message);
     });
@@ -73,10 +107,14 @@
     window.closeAccountModal = () => document.getElementById('account-modal').close();
     window.signInGoogle = async () => {
         await ready;
-        const result = session && session.user.is_anonymous
-            ? await client.auth.linkIdentity({ provider: 'google', options: { redirectTo: window.location.origin } })
-            : await client.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
-        if (result.error) showAuthMessage(result.error.message, true);
+        if (!client || initError) return showAuthMessage(initError?.message || 'Accounts are unavailable.', true);
+        showAuthMessage('Opening Google...');
+        try {
+            const result = session && session.user.is_anonymous
+                ? await withTimeout(client.auth.linkIdentity({ provider: 'google', options: { redirectTo: window.location.origin } }), 15000, 'Google sign-in')
+                : await withTimeout(client.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } }), 15000, 'Google sign-in');
+            if (result.error) showAuthMessage(result.error.message, true);
+        } catch (error) { showAuthMessage(error.message, true); }
     };
     window.signInExistingGoogle = async () => {
         await ready;
@@ -88,11 +126,16 @@
     };
     window.sendEmailOtp = async () => {
         await ready;
+        if (!client || initError) return showAuthMessage(initError?.message || 'Accounts are unavailable.', true);
         const email = document.getElementById('auth-email').value.trim();
         if (!email) return showAuthMessage('Enter your email address.', true);
-        const result = session && session.user.is_anonymous
-            ? await client.auth.updateUser({ email })
-            : await client.auth.signInWithOtp({ email });
+        showAuthMessage('Sending verification code...');
+        let result;
+        try {
+            result = session && session.user.is_anonymous
+                ? await withTimeout(client.auth.updateUser({ email }), 15000, 'Email verification')
+                : await withTimeout(client.auth.signInWithOtp({ email }), 15000, 'Email verification');
+        } catch (error) { return showAuthMessage(error.message, true); }
         if (result.error) return showAuthMessage(result.error.message, true);
         document.getElementById('otp-row').hidden = false;
         showAuthMessage('Check your email for the verification code.');
