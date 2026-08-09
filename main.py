@@ -158,10 +158,28 @@ def transcribe_audio(tmp_path: str) -> list:
                     response_format="verbose_json",
                     timestamp_granularities=["segment"]
                 )
-            segments = getattr(transcription, "segments", None) or []
+            if isinstance(transcription, dict):
+                segments = transcription.get("segments", [])
+            else:
+                segments = getattr(transcription, "segments", None) or []
             print(f"Groq transcription complete. Got {len(segments)} segments.")
-            # Normalise to same dict format as local Whisper
-            return [{"start": s.start, "text": s.text} for s in segments]
+
+            def _get_val(obj, key):
+                if isinstance(obj, dict):
+                    return obj.get(key)
+                return getattr(obj, key, None)
+
+            parsed_segments = []
+            for s in segments:
+                start_val = _get_val(s, "start")
+                text_val = _get_val(s, "text")
+                if start_val is not None:
+                    parsed_segments.append({
+                        "start": float(start_val),
+                        "text": str(text_val or "").strip()
+                    })
+
+            return parsed_segments
         except HTTPException:
             raise
         except Exception as e:
