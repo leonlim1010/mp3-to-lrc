@@ -46,6 +46,10 @@
     function updateAccountUi(user, enabled, error) {
         const status = document.getElementById('account-status');
         const button = document.getElementById('account-button');
+        const downloadButton = document.getElementById('download-btn');
+        const deleteButton = document.getElementById('delete-btn');
+        if (downloadButton) downloadButton.hidden = !enabled;
+        if (deleteButton) deleteButton.hidden = !enabled;
         if (!status || !button) return;
         if (!enabled) {
             status.textContent = error ? 'Accounts unavailable' : 'Local mode';
