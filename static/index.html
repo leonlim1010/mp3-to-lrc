@@ -474,7 +474,7 @@
         <button class="btn btn-ghost modal-full-btn" onclick="sendExistingEmailOtp()">Email OTP for an existing account</button>
         <div class="modal-row" id="otp-row" hidden><input id="auth-otp" class="tag-input" inputmode="numeric" placeholder="6-digit code"><button class="btn btn-success" onclick="verifyEmailOtp()">Verify</button></div>
         <p class="auth-message" id="auth-message"></p>
-        <button class="btn btn-ghost" onclick="signOutAccount()">Reset this session / Sign out</button>
+        <button class="btn btn-ghost" id="account-signout" onclick="signOutAccount()">Sign out to guest mode</button>
     </dialog>
 
     <dialog class="modal guide-modal" id="guide-modal">
@@ -489,7 +489,7 @@
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.2"></script>
-    <script src="/static/auth.js?v=20260809-2"></script>
+    <script src="/static/auth.js?v=20260809-3"></script>
     <script src="/static/script.js"></script>
 </body>
 
