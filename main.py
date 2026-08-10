@@ -504,7 +504,7 @@ async def download_private_lrc(record_id: str, request: Request):
     return Response(
         content, media_type="text/plain; charset=utf-8",
         headers={"Content-Disposition":
-                 f'attachment; filename="{safe_name}"; filename*=UTF-8\'\'{encoded_name}'},
+                 f'attachment; filename="lyrics.lrc"; filename*=UTF-8\'\'{encoded_name}'},
     )
 
 
