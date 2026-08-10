@@ -1432,6 +1432,9 @@ body {
     padding: 1rem;
 }
 
+.tag-upload-button { width: 100%; justify-content: center; margin-bottom: .45rem; cursor: pointer; }
+.tag-upload-hint { margin-bottom: .8rem; line-height: 1.35; }
+
 /* Tag sidebar btn: two-line display */
 .tag-btn-title {
     display: block;

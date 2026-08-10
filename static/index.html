@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SoniScript — MP3 to LRC</title>
     <meta name="description" content="Transcribe MP3 files to LRC and correct lyrics with precise timestamps.">
-    <link rel="stylesheet" href="/static/style.css?v=20260810-3">
+    <link rel="stylesheet" href="/static/style.css?v=20260810-4">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
 </head>
 
@@ -240,7 +240,7 @@
                             <button class="btn btn-ghost icon-btn" title="Refresh list"
                                 onclick="loadTesterLrcList()">↻</button>
                         </div>
-                        <p class="tester-hint">From <code>C:\Users\User\Music</code> (*_modified.lrc)</p>
+                        <p class="tester-hint">Your private modified LRC files</p>
                     </div>
 
                     <!-- MP3 pick -->
@@ -253,7 +253,7 @@
                             <button class="btn btn-ghost icon-btn" title="Refresh list"
                                 onclick="loadTesterMp3List()">↻</button>
                         </div>
-                        <p class="tester-hint">From <code>C:\Users\User\Music</code> (*.mp3)</p>
+                        <p class="tester-hint">Local desktop files only; cloud users can upload below</p>
                     </div>
 
                     <!-- Divider -->
@@ -372,13 +372,18 @@
                             <button class="btn btn-ghost icon-btn" title="Refresh" onclick="loadTagMp3List()">↻</button>
                         </div>
                     </div>
+                    <label class="btn btn-primary tag-upload-button">
+                        <input type="file" id="tag-mp3-upload" accept=".mp3,audio/mpeg" hidden onchange="uploadTagMp3(this)">
+                        Choose MP3 from device
+                    </label>
+                    <p class="tester-hint tag-upload-hint">The MP3 is temporary. Edit its tags, then download the updated copy.</p>
                     <div class="sidebar-search-wrap">
                         <span class="search-icon">🔍</span>
                         <input type="search" id="tags-search" class="lrc-search-input" placeholder="Filter files…"
                             oninput="filterTagList(this.value)" autocomplete="off">
                     </div>
                     <div class="lrc-list" id="tags-mp3-list">
-                        <p class="empty-state">Loading MP3 files…</p>
+                        <p class="empty-state">Choose an MP3 from your device.</p>
                     </div>
                 </aside>
 
@@ -401,6 +406,9 @@
                         <div class="editor-top-bar">
                             <span class="editor-filename" id="tags-filename"></span>
                             <div style="display:flex;gap:0.5rem;">
+                                <button class="btn btn-ghost" id="tags-download-btn" onclick="downloadTaggedMp3()">
+                                    Download MP3
+                                </button>
                                 <button class="btn btn-ghost" id="tags-rename-btn" onclick="renameTagFile()" title="Rename to Artist - Title.mp3">
                                     ✏️ Rename
                                 </button>
@@ -570,7 +578,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.2"></script>
     <script src="/static/auth.js?v=20260810-7"></script>
-    <script src="/static/script.js?v=20260810-2"></script>
+    <script src="/static/script.js?v=20260810-3"></script>
 </body>
 
 </html>

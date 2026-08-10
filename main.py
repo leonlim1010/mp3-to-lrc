@@ -40,6 +40,7 @@ except ImportError:
 # In-memory temp audio store: token -> {path, created_at}
 # ---------------------------------------------------------------------------
 _audio_tokens: dict = {}
+_tag_tokens: dict = {}
 _token_lock = threading.Lock()
 TEMP_AUDIO_TTL = 7200  # 2 hours in seconds
 
@@ -55,6 +56,13 @@ def _cleanup_old_tokens():
             except OSError:
                 pass
             del _audio_tokens[t]
+        expired_tags = [t for t, v in _tag_tokens.items() if now - v["created_at"] > TEMP_AUDIO_TTL]
+        for t in expired_tags:
+            try:
+                os.remove(_tag_tokens[t]["path"])
+            except OSError:
+                pass
+            del _tag_tokens[t]
 
 
 @asynccontextmanager
@@ -68,6 +76,12 @@ async def lifespan(app_: FastAPI):
             except OSError:
                 pass
         _audio_tokens.clear()
+        for v in _tag_tokens.values():
+            try:
+                os.remove(v["path"])
+            except OSError:
+                pass
+        _tag_tokens.clear()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -473,12 +487,24 @@ async def get_lrc(filename: str, request: Request):
 
 @app.get("/api/lrc/{record_id}/download")
 async def download_private_lrc(record_id: str, request: Request):
-    who = cloud_store.identity(request)
-    record = cloud_store.get_lrc(who, record_id)
-    safe_name = Path(record["filename"]).name.replace('"', "")
+    if IS_CLOUD and cloud_store.ENABLED:
+        who = cloud_store.identity(request)
+        record = cloud_store.get_lrc(who, record_id)
+        safe_name = Path(record["filename"]).name.replace('"', "")
+        content = record["lrc_content"]
+    else:
+        safe_name = Path(record_id).name
+        if not safe_name.lower().endswith(".lrc"):
+            raise HTTPException(status_code=400, detail="Only LRC files are allowed.")
+        lrc_path = MUSIC_DIR / safe_name
+        if not lrc_path.exists():
+            raise HTTPException(status_code=404, detail="LRC file not found.")
+        content = lrc_path.read_text(encoding="utf-8")
+    encoded_name = urllib.parse.quote(safe_name)
     return Response(
-        record["lrc_content"], media_type="text/plain; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{safe_name}"'},
+        content, media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition":
+                 f'attachment; filename="{safe_name}"; filename*=UTF-8\'\'{encoded_name}'},
     )
 
 
@@ -957,9 +983,95 @@ def _get_cover_b64(file_path: Path) -> str:
     return ""
 
 
+def _write_tags(file_path: Path, title: str, artist: str, album: str,
+                year: str, genre: str, cover_data: Optional[str]) -> None:
+    if not MUTAGEN_AVAILABLE:
+        raise HTTPException(status_code=500, detail="mutagen not installed.")
+    try:
+        from mutagen.id3 import TPE2
+        audio_file = MP3(str(file_path))
+        if audio_file.tags is None:
+            audio_file.add_tags()
+        audio = audio_file.tags
+        for key in [k for k in audio.keys() if k.startswith("TXXX") or k.startswith("TSSE")]:
+            del audio[key]
+        audio["TIT2"] = TIT2(encoding=3, text=title)
+        audio["TPE1"] = TPE1(encoding=3, text=artist)
+        audio["TPE2"] = TPE2(encoding=3, text=artist)
+        audio["TALB"] = TALB(encoding=3, text=album)
+        audio["TDRC"] = TDRC(encoding=3, text=year)
+        audio["TCON"] = TCON(encoding=3, text=genre)
+        if cover_data is not None:
+            for key in [k for k in audio.keys() if k.startswith("APIC")]:
+                del audio[key]
+            if cover_data:
+                header, _, encoded = cover_data.partition(",")
+                mime = "image/png" if "image/png" in header else "image/webp" if "image/webp" in header else "image/jpeg"
+                audio.add(APIC(encoding=3, mime=mime, type=3, desc="Cover",
+                               data=base64.b64decode(encoded)))
+        audio_file.save(v2_version=3)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+def _tag_token_record(token: str, who: cloud_store.Identity) -> dict:
+    _cleanup_old_tokens()
+    with _token_lock:
+        record = _tag_tokens.get(token)
+    if not record or record["user_id"] != who.id:
+        raise HTTPException(status_code=404, detail="Temporary MP3 not found or expired.")
+    return record
+
+
 # ---------------------------------------------------------------------------
 # Tag Manager endpoints
 # ---------------------------------------------------------------------------
+
+@app.post("/api/tag/upload")
+async def upload_tag_mp3(request: Request, audio_file: UploadFile = File(...)):
+    who = cloud_store.identity(request)
+    if not audio_file.filename.lower().endswith(".mp3"):
+        raise HTTPException(status_code=400, detail="Only MP3 files are supported.")
+    _cleanup_old_tokens()
+    token = str(uuid.uuid4())
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
+        shutil.copyfileobj(audio_file.file, tmp)
+        path = Path(tmp.name)
+    if path.stat().st_size > 25 * 1024 * 1024:
+        path.unlink(missing_ok=True)
+        raise HTTPException(status_code=413, detail="MP3 exceeds the 25 MB upload limit.")
+    safe_name = Path(audio_file.filename).name
+    with _token_lock:
+        _tag_tokens[token] = {"path": str(path), "created_at": time.time(),
+                              "user_id": who.id, "filename": safe_name}
+    return {"token": token, "filename": safe_name, **_read_tags(path),
+            "cover_data": _get_cover_b64(path)}
+
+
+@app.post("/api/tag/{token}")
+async def update_uploaded_tags(
+    token: str,
+    request: Request,
+    title: str = Form(""), artist: str = Form(""), album: str = Form(""),
+    year: str = Form(""), genre: str = Form(""),
+    cover_data: Optional[str] = Form(None),
+):
+    who = cloud_store.identity(request)
+    record = _tag_token_record(token, who)
+    _write_tags(Path(record["path"]), title, artist, album, year, genre, cover_data)
+    return {"saved": record["filename"]}
+
+
+@app.get("/api/tag/{token}/download")
+async def download_tagged_mp3(token: str, request: Request, filename: str = "tagged.mp3"):
+    who = cloud_store.identity(request)
+    record = _tag_token_record(token, who)
+    safe_name = Path(filename).name
+    if not safe_name.lower().endswith(".mp3"):
+        safe_name += ".mp3"
+    return FileResponse(record["path"], media_type="audio/mpeg", filename=safe_name)
 
 @app.get("/list_all_mp3")
 async def list_all_mp3():

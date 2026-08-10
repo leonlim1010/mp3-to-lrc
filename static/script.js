@@ -471,15 +471,29 @@ async function saveModified() {
 
 async function downloadSelectedLrc() {
     if (!selectedLrcFile) return;
-    const res = await fetch(`/api/lrc/${encodeURIComponent(selectedLrcFile)}/download`);
-    if (!res.ok) return alert('Download failed.');
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = editorFilename.textContent || 'lyrics.lrc';
-    link.click();
-    URL.revokeObjectURL(url);
+    const button = document.getElementById('download-btn');
+    button.disabled = true;
+    try {
+        const res = await fetch(`/api/lrc/${encodeURIComponent(selectedLrcFile)}/download`);
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            throw new Error(error.detail || `Download failed (${res.status}).`);
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = editorFilename.textContent || 'lyrics.lrc';
+        link.hidden = true;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+        alert(`Download failed: ${error.message}`);
+    } finally {
+        button.disabled = false;
+    }
 }
 
 async function deleteSelectedLrc() {
@@ -1003,6 +1017,9 @@ async function saveTesterLrc() {
 
 // --- State ---
 let tagCurrentFile = null;    // filename currently loaded
+let tagCurrentToken = null;   // private temporary cloud upload token
+let tagDownloadName = null;
+let tagUploadedData = null;
 let tagCoverData   = '';      // base64 data-URL or '' if no new cover
 let tagCoverRemoved = false;  // true if user clicked Remove
 /** @type {Array<{filename,title,artist,album}>} */
@@ -1036,6 +1053,13 @@ const ytFetchBtn     = document.getElementById('yt-fetch-btn');
 
 // --- Load MP3 list ---
 async function loadTagMp3List() {
+    if (window.appConfig?.cloud) {
+        if (!tagCurrentToken) {
+            tagsMp3List.innerHTML = '<p class="empty-state">Choose an MP3 from your device above.</p>';
+            tagsCountBadge.style.display = 'none';
+        }
+        return;
+    }
     tagsMp3List.innerHTML = '<p class="empty-state">Loading</p>';
     tagsCountBadge.style.display = 'none';
     try {
@@ -1045,6 +1069,35 @@ async function loadTagMp3List() {
         renderTagMp3List(allTagFiles);
     } catch (e) {
         tagsMp3List.innerHTML = '<p class="empty-state" style="color:var(--red)">Failed to load MP3s.</p>';
+    }
+}
+
+async function uploadTagMp3(input) {
+    const file = input.files[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.mp3')) {
+        input.value = '';
+        return alert('Please choose an MP3 file.');
+    }
+    tagsMp3List.innerHTML = '<p class="empty-state">Uploading MP3...</p>';
+    const formData = new FormData();
+    formData.append('audio_file', file);
+    try {
+        const response = await fetch('/api/tag/upload', { method: 'POST', body: formData });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.detail || 'Upload failed.');
+        tagCurrentToken = data.token;
+        tagCurrentFile = data.filename;
+        tagDownloadName = data.filename;
+        tagUploadedData = data;
+        allTagFiles = [{ filename: data.filename, title: data.title || '', artist: data.artist || '', album: data.album || '' }];
+        renderTagMp3List(allTagFiles);
+        const button = tagsMp3List.querySelector('.tag-mp3-btn');
+        applyTagData(data, button);
+    } catch (error) {
+        tagsMp3List.innerHTML = `<p class="empty-state" style="color:var(--red)">${escHtml(error.message)}</p>`;
+    } finally {
+        input.value = '';
     }
 }
 
@@ -1079,7 +1132,9 @@ function makeTagMp3Btn(item, num) {
             <span class="tag-btn-title">${escHtml(displayTitle)}</span>
             ${displayArtist ? `<span class="tag-btn-artist">${escHtml(displayArtist)}</span>` : ''}
         </span>`;
-    btn.onclick = () => openTagFile(item.filename, btn);
+    btn.onclick = () => tagCurrentToken && tagUploadedData
+        ? applyTagData(tagUploadedData, btn)
+        : openTagFile(item.filename, btn);
     return btn;
 }
 
@@ -1138,6 +1193,27 @@ async function openTagFile(filename, btnEl) {
     } catch (e) {
         setTagsStatus(`Error: ${e.message}`, 'error');
     }
+}
+
+function applyTagData(data, btnEl) {
+    document.querySelectorAll('.tag-mp3-btn').forEach(button => button.classList.remove('selected'));
+    if (btnEl) btnEl.classList.add('selected');
+    tagsEmpty.style.display = 'none';
+    tagsContent.style.display = 'flex';
+    tagsFilename.textContent = data.filename;
+    tagTitle.value = data.title || '';
+    tagArtist.value = data.artist || '';
+    tagAlbum.value = data.album || '';
+    tagYear.value = data.year || '';
+    tagGenre.value = data.genre || '';
+    tagCoverData = '';
+    tagCoverRemoved = false;
+    resetCoverDisplay();
+    if (data.cover_data) showCover(data.cover_data);
+    const autoQuery = [data.artist, data.title].filter(Boolean).join(' ');
+    if (metaSearchInput && autoQuery) metaSearchInput.value = autoQuery;
+    metaResults.innerHTML = '';
+    setTagsStatus('Ready to edit. Download the MP3 when finished.', 'success');
 }
 
 // --- Cover art helpers ---
@@ -1210,14 +1286,22 @@ async function saveTags() {
             formData.append('cover_data', '');
         }
 
-        const res = await fetch('/update_tags', { method: 'POST', body: formData });
+        const endpoint = tagCurrentToken ? `/api/tag/${encodeURIComponent(tagCurrentToken)}` : '/update_tags';
+        const res = await fetch(endpoint, { method: 'POST', body: formData });
         if (!res.ok) {
             const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
             throw new Error(err.detail);
         }
         setTagsStatus('✓ Tags saved successfully!', 'success');
+        if (tagCurrentToken && tagUploadedData) {
+            Object.assign(tagUploadedData, {
+                filename: tagCurrentFile,
+                title: tagTitle.value.trim(), artist: tagArtist.value.trim(),
+                album: tagAlbum.value.trim(), year: tagYear.value.trim(), genre: tagGenre.value.trim()
+            });
+        }
         // Refresh sidebar to reflect new title/artist
-        loadTagMp3List();
+        if (!tagCurrentToken) loadTagMp3List();
     } catch (e) {
         setTagsStatus(`Error: ${e.message}`, 'error');
     } finally {
@@ -1244,6 +1328,15 @@ async function renameTagFile() {
 
     if (!confirm(`Rename file to:\n"${newName}"?`)) return;
 
+    if (tagCurrentToken) {
+        tagDownloadName = newName;
+        tagCurrentFile = newName;
+        if (tagUploadedData) tagUploadedData.filename = newName;
+        tagsFilename.textContent = newName;
+        setTagsStatus(`Download filename changed to "${newName}".`, 'success');
+        return;
+    }
+
     tagsRenameBtn.disabled = true;
     try {
         const formData = new FormData();
@@ -1263,6 +1356,35 @@ async function renameTagFile() {
         setTagsStatus(`Error: ${e.message}`, 'error');
     } finally {
         tagsRenameBtn.disabled = false;
+    }
+}
+
+async function downloadTaggedMp3() {
+    if (!tagCurrentToken) {
+        return alert('Choose an MP3 from your device first.');
+    }
+    const button = document.getElementById('tags-download-btn');
+    button.disabled = true;
+    try {
+        const filename = tagDownloadName || tagCurrentFile || 'tagged.mp3';
+        const response = await fetch(`/api/tag/${encodeURIComponent(tagCurrentToken)}/download?filename=${encodeURIComponent(filename)}`);
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.detail || 'Download failed.');
+        }
+        const url = URL.createObjectURL(await response.blob());
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.hidden = true;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+        alert(`Download failed: ${error.message}`);
+    } finally {
+        button.disabled = false;
     }
 }
 
