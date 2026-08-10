@@ -305,6 +305,13 @@ const generateReviewBtn = document.getElementById('generate-review-btn');
 /** @type {{timestamp_str:string, text:string}[]} */
 let currentLines = [];
 
+function revealMobileWorkspace(element) {
+    if (!element || !window.matchMedia('(max-width: 800px)').matches) return;
+    window.requestAnimationFrame(() => {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+}
+
 async function openLrc(filename, btnEl, displayName = filename) {
     // Highlight selected
     document.querySelectorAll('.lrc-file-btn').forEach(b => b.classList.remove('selected'));
@@ -330,6 +337,7 @@ async function openLrc(filename, btnEl, displayName = filename) {
         lyricsEditor.value = currentLines.map(l => l.text).join('\n');
         updateLineCount();
         saveBtn.disabled = false;
+        revealMobileWorkspace(document.getElementById('editor-main'));
     } catch (e) {
         timestampsPanel.innerHTML = `<span style="color:var(--red)">${e.message}</span>`;
     }
@@ -793,6 +801,7 @@ async function loadTesterFiles() {
         // Show player
         testerEmpty.style.display = 'none';
         testerPlayerContent.style.display = 'flex';
+        revealMobileWorkspace(document.getElementById('tester-player-card'));
 
         setTesterStatus(`✓ Loaded ${lines.length} lyric lines. Press play!`, 'success');
     } catch (e) {
@@ -1190,6 +1199,7 @@ async function openTagFile(filename, btnEl) {
         if (metaSearchInput && autoQ) metaSearchInput.value = autoQ;
         metaResults.innerHTML = '';
         setTagsStatus('', '');
+        revealMobileWorkspace(document.getElementById('tags-main'));
     } catch (e) {
         setTagsStatus(`Error: ${e.message}`, 'error');
     }
@@ -1214,6 +1224,7 @@ function applyTagData(data, btnEl) {
     if (metaSearchInput && autoQuery) metaSearchInput.value = autoQuery;
     metaResults.innerHTML = '';
     setTagsStatus('Ready to edit. Download the MP3 when finished.', 'success');
+    revealMobileWorkspace(document.getElementById('tags-main'));
 }
 
 // --- Cover art helpers ---

@@ -1704,3 +1704,136 @@ body {
     padding: 0.35rem 0.8rem;
     font-size: 0.82rem;
 }
+
+/* Mobile tool workspaces. Kept after desktop rules so these overrides win. */
+@media (max-width: 800px) {
+    .editor-layout, .tester-layout, .tags-layout {
+        flex-direction: column !important;
+        align-items: stretch;
+        gap: 0.85rem;
+        padding: 0.75rem;
+        overflow: visible;
+    }
+
+    .editor-sidebar, .tags-sidebar {
+        flex: none;
+        width: 100%;
+        min-height: 170px;
+        max-height: 280px;
+        overflow: hidden;
+    }
+
+    .sidebar-resizer { display: none; }
+
+    .editor-main, .tester-player-card, .tags-main {
+        flex: none;
+        width: 100%;
+        min-width: 0;
+        min-height: 0;
+        overflow: visible;
+    }
+
+    .editor-empty, .tester-empty { min-height: 240px; }
+
+    .editor-content, .tester-player-content, .tags-content {
+        height: auto;
+        min-height: 0;
+        overflow: visible;
+    }
+
+    .editor-top-bar, .tester-song-bar {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0.65rem;
+    }
+
+    .editor-top-bar > div, .tester-song-bar > div {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .editor-columns {
+        flex: none;
+        flex-direction: column;
+        overflow: visible;
+    }
+
+    .editor-col {
+        flex: none;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .timestamps-panel {
+        flex: none;
+        height: 220px;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .lyrics-textarea {
+        flex: none;
+        height: 360px;
+        min-height: 280px;
+        resize: vertical;
+        overflow-y: auto;
+        touch-action: pan-y;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .tester-setup-card {
+        flex: none;
+        width: 100%;
+        max-height: none;
+        overflow: visible;
+    }
+
+    .tester-player-card { min-height: 520px; }
+
+    .tester-tools-panel {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+
+    .tester-tools-panel .tools-group, .tester-tools-panel .tools-right {
+        width: 100%;
+        margin-left: 0;
+        flex-wrap: wrap;
+    }
+
+    .tester-lyrics-wrap {
+        flex: none;
+        height: min(440px, 58vh);
+        min-height: 300px;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .tags-editor-body {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+    }
+
+    .tags-cover-col, .tags-fields-col, .tags-autofill-section { width: 100%; }
+    .tags-row-2 { grid-template-columns: 1fr; }
+    .tags-search-row { flex-wrap: wrap; }
+    .tags-search-row .tag-input { flex-basis: 100%; }
+
+    .meta-results {
+        max-height: 360px;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .meta-result-card {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .meta-info { min-width: calc(100% - 70px); }
+    .meta-apply-btn { width: 100%; }
+}
