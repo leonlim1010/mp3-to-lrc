@@ -15,7 +15,11 @@ testing, and ID3 tag management.
 5. Add these Auth redirect URLs:
    - `http://localhost:8000`
    - `https://music-management-l6n6.onrender.com`
-6. Add these Render environment variables:
+6. In **Authentication > Email Templates**, ensure the **Change email address**
+   and **Reset password** buttons link to `{{ .ConfirmationURL }}`. Do not use
+   `{{ .SiteURL }}` for these buttons because it discards the action-specific
+   redirect and makes the link behave like an ordinary sign-in link.
+7. Add these Render environment variables:
 
    ```text
    SUPABASE_URL=https://YOUR_PROJECT.supabase.co

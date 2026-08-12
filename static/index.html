@@ -560,6 +560,7 @@
 
         <section class="auth-panel account-panel" data-auth-panel="account" hidden>
             <p>You are signed in as <strong id="account-email"></strong>.</p>
+            <button class="btn btn-primary modal-full-btn" onclick="setAuthView('password')">Set or change password</button>
             <button class="btn btn-ghost modal-full-btn" id="account-signout" onclick="signOutAccount()">Sign out to guest mode</button>
         </section>
         <p class="auth-message" id="auth-message"></p>
@@ -577,7 +578,7 @@
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.2"></script>
-    <script src="/static/auth.js?v=20260810-7"></script>
+    <script src="/static/auth.js?v=20260812-2"></script>
     <script src="/static/script.js?v=20260810-4"></script>
 </body>
 

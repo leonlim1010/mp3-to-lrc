@@ -18,6 +18,30 @@
         const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
         return query.get('type') || hash.get('type') || '';
     })();
+    const authAction = new URLSearchParams(window.location.search).get('auth_action') || '';
+
+    function authRedirectUrl(action) {
+        const url = new URL(window.location.origin);
+        url.searchParams.set('auth_action', action);
+        return url.toString();
+    }
+
+    function needsPassword(user, event = '') {
+        if (!user || user.is_anonymous) return false;
+        return event === 'PASSWORD_RECOVERY' ||
+            authCallbackType === 'recovery' || authCallbackType === 'email_change' ||
+            authAction === 'set-password' || authAction === 'reset-password' ||
+            user?.user_metadata?.soniscript_needs_password === true ||
+            localStorage.getItem('soniscript-email-upgrade') === 'pending';
+    }
+
+    function showPasswordForm() {
+        localStorage.removeItem('soniscript-email-upgrade');
+        setAuthView('password');
+        const modal = document.getElementById('account-modal');
+        if (!modal.open) modal.showModal();
+        setTimeout(() => document.getElementById('new-password')?.focus(), 0);
+    }
 
     function callbackError() {
         const query = new URLSearchParams(window.location.search);
@@ -63,13 +87,15 @@
         // initialization. Subscribe immediately so that event cannot be missed.
         let resolveCallbackSession;
         const callbackSession = new Promise(resolve => { resolveCallbackSession = resolve; });
-        client.auth.onAuthStateChange((_event, nextSession) => {
+        client.auth.onAuthStateChange((event, nextSession) => {
             session = nextSession;
             if (nextSession) {
+                if (needsPassword(nextSession.user, event)) showPasswordForm();
                 // An identity-link callback may briefly expose the old guest
-                // session. Keep waiting until the Google identity is applied.
-                if (!authCallback || !nextSession.user.is_anonymous) {
-                    resolveCallbackSession(nextSession);
+                // or registered session through INITIAL_SESSION. Keep waiting
+                // until Supabase has actually applied the callback tokens.
+                if (!authCallback || (event !== 'INITIAL_SESSION' && !nextSession.user.is_anonymous)) {
+                    resolveCallbackSession({ event, session: nextSession });
                     updateAccountUi(nextSession.user, true);
                 }
             } else if (!authCallback) {
@@ -84,15 +110,11 @@
                 clearAuthCallbackUrl();
                 throw new Error(oauthError);
             }
-            session = await withTimeout(callbackSession, 30000, 'Google sign-in completion');
+            const callbackResult = await withTimeout(callbackSession, 30000, 'Account link completion');
+            session = callbackResult.session;
             clearAuthCallbackUrl();
             updateAccountUi(session.user, true);
-            if (authCallbackType === 'recovery' || authCallbackType === 'email_change' ||
-                localStorage.getItem('soniscript-email-upgrade') === 'pending') {
-                localStorage.removeItem('soniscript-email-upgrade');
-                setAuthView('password');
-                document.getElementById('account-modal').showModal();
-            }
+            if (needsPassword(session.user, callbackResult.event)) showPasswordForm();
             return;
         }
 
@@ -108,6 +130,7 @@
             session = anonymous.data.session;
         }
         updateAccountUi(session.user, true);
+        if (needsPassword(session.user)) showPasswordForm();
     })().catch(error => {
         // A created client can still perform Google/email login even when
         // automatic guest restoration failed. Only configuration/SDK failures
@@ -254,7 +277,10 @@
         showAuthMessage('Sending confirmation email...');
         try {
             const result = await withTimeout(
-                client.auth.updateUser({ email }, { emailRedirectTo: window.location.origin }),
+                client.auth.updateUser({
+                    email,
+                    data: { soniscript_needs_password: true }
+                }, { emailRedirectTo: authRedirectUrl('set-password') }),
                 30000, 'Email confirmation'
             );
             if (result.error) throw result.error;
@@ -270,7 +296,7 @@
         showAuthMessage('Sending password reset email...');
         try {
             const result = await withTimeout(client.auth.resetPasswordForEmail(email, {
-                redirectTo: window.location.origin
+                redirectTo: authRedirectUrl('reset-password')
             }), 30000, 'Password reset');
             if (result.error) throw result.error;
             showAuthMessage('Reset email sent. Open its link to choose a new password.');
@@ -285,6 +311,10 @@
         try {
             const result = await withTimeout(client.auth.updateUser({ password }), 30000, 'Password update');
             if (result.error) throw result.error;
+            const metadataResult = await withTimeout(client.auth.updateUser({
+                data: { soniscript_needs_password: false }
+            }), 30000, 'Account setup completion');
+            if (metadataResult.error) throw metadataResult.error;
             session = (await client.auth.getSession()).data.session;
             updateAccountUi(session.user, true);
             showAuthMessage('Password saved. Your account is ready.');
