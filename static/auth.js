@@ -43,6 +43,14 @@
         setTimeout(() => document.getElementById('new-password')?.focus(), 0);
     }
 
+    function callbackSessionIsReady(event, nextSession) {
+        if (!authCallback) return true;
+        // During Google identity linking, Supabase may first restore the old
+        // guest session. Reject only that anonymous session; once linking or
+        // any email action succeeds, the non-anonymous session is ready.
+        return Boolean(nextSession && !nextSession.user.is_anonymous);
+    }
+
     function callbackError() {
         const query = new URLSearchParams(window.location.search);
         const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
@@ -91,10 +99,10 @@
             session = nextSession;
             if (nextSession) {
                 if (needsPassword(nextSession.user, event)) showPasswordForm();
-                // An identity-link callback may briefly expose the old guest
-                // or registered session through INITIAL_SESSION. Keep waiting
-                // until Supabase has actually applied the callback tokens.
-                if (!authCallback || (event !== 'INITIAL_SESSION' && !nextSession.user.is_anonymous)) {
+                // Identity linking may briefly expose the old anonymous guest.
+                // Accept the first permanent session without waiting for a
+                // second auth event.
+                if (callbackSessionIsReady(event, nextSession)) {
                     resolveCallbackSession({ event, session: nextSession });
                     updateAccountUi(nextSession.user, true);
                 }
