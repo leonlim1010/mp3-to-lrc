@@ -914,14 +914,13 @@ body {
     body { overflow: auto; }
     .app-shell { min-height: 100dvh; height: auto; overflow: visible; }
     .app-header { height: auto; min-height: 60px; padding: .65rem .8rem 0; gap: .65rem; flex-wrap: wrap; }
-    .brand { flex: 1; }
+    .brand { flex: 1 1 auto; min-width: 0; }
     .brand h1 { font-size: 1.1rem; }
-    .header-actions { margin-left: 0; gap: .4rem; }
+    .header-actions { margin-left: auto; flex: 0 0 auto; gap: .4rem; }
     .help-button { padding: .55rem .65rem; }
     .help-label-full { display: none; }
     .help-label-compact { display: inline; }
-    .account-summary { max-width: 120px; }
-    .account-summary span { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .account-summary { display: none; }
     .header-actions .btn-primary { padding: .55rem .7rem; }
     .tab-bar { order: 3; width: calc(100% + 1.6rem); margin: 0 -.8rem; overflow-x: auto;
         scrollbar-width: none; border-top: 1px solid var(--border); }
