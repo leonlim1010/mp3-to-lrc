@@ -856,6 +856,7 @@ body {
 .usage-error { margin-top: .8rem; color: var(--red) !important; }
 
 .header-actions { margin-left: auto; display: flex; align-items: center; gap: .7rem; }
+.help-label-compact { display: none; }
 .account-summary { display: flex; flex-direction: column; max-width: 280px; }
 .account-summary span { font-weight: 600; font-size: .85rem; }
 .account-summary small { color: var(--text-muted); white-space: nowrap; font-size: .68rem; }
@@ -906,6 +907,7 @@ body {
 @media (max-width: 1050px) {
     .account-summary small { display: none; }
     .header-actions .btn-ghost { display: none; }
+    .header-actions .help-button { display: inline-flex; }
 }
 
 @media (max-width: 760px) {
@@ -915,6 +917,9 @@ body {
     .brand { flex: 1; }
     .brand h1 { font-size: 1.1rem; }
     .header-actions { margin-left: 0; gap: .4rem; }
+    .help-button { padding: .55rem .65rem; }
+    .help-label-full { display: none; }
+    .help-label-compact { display: inline; }
     .account-summary { max-width: 120px; }
     .account-summary span { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .header-actions .btn-primary { padding: .55rem .7rem; }
